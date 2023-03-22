@@ -1,0 +1,27 @@
+name: scrHLAtag
+version: "0.1"
+author: scfurl
+about: count reads bam files per cb and umi for scrHLA typing
+args:
+    - bam:
+        long: bam
+        short: b
+        takes_value: true
+        required: true
+        help: input bam
+    - threads:
+        long: threads
+        short: t
+        takes_value: true
+        required: false
+        help: threads
+    - cb:
+        short: c
+        help: character to parse cell barcode; default = 'CB='
+        takes_value: true
+        required: false
+    - umi:
+        short: umi
+        help: character to parse umi; default = 'XM='
+        takes_value: true
+        required: false
