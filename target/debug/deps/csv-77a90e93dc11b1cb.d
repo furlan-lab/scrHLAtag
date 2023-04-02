@@ -1,0 +1,15 @@
+/Users/sfurlan/develop/scrHLAtag/target/debug/deps/csv-77a90e93dc11b1cb.rmeta: /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/lib.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/byte_record.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/cookbook.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/debug.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/deserializer.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/error.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/reader.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/serializer.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/string_record.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/tutorial.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/writer.rs
+
+/Users/sfurlan/develop/scrHLAtag/target/debug/deps/csv-77a90e93dc11b1cb.d: /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/lib.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/byte_record.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/cookbook.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/debug.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/deserializer.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/error.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/reader.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/serializer.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/string_record.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/tutorial.rs /Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/writer.rs
+
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/lib.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/byte_record.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/cookbook.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/debug.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/deserializer.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/error.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/reader.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/serializer.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/string_record.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/tutorial.rs:
+/Users/sfurlan/.cargo/registry/src/github.com-1ecc6299db9ec823/csv-1.2.1/src/writer.rs:
