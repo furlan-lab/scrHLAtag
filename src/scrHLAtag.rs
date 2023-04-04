@@ -1,6 +1,4 @@
 #![allow(non_snake_case)]
-
-
 /**
 
 target/release/scrHLAtag -b data/AML_403_34_HLA.dedup.bam -a data/testhla.tsv
@@ -11,72 +9,32 @@ target/release/scrHLAtag -b data/AML_403_34_HLA.dedup.bam -a data/testhla.tsv
 // single cell hla typing, alignment, and grouping - scrHLAtag
 
 
-// #[allow(non_snake_case)]
-// #[allow(unused_must_use)]
-// #[allow(dead_code)]
-
 extern crate csv;
 extern crate clap;
-extern crate bam;
 extern crate serde;
-// extern crate itertools;
-// extern crate fasta;
-extern crate seq_io;
 extern crate minimap2;
+extern crate noodles;
 
-
-// use std::io
-// use std::fs;
+use std::{io, str, fs, fs::File, error::Error, path::Path, collections::HashMap, process::{Command, Stdio }};
+use std::io::{BufReader, BufWriter};
 use clap::{App, load_yaml};
-use std::str;
-use std::error::Error;
 use serde::Deserialize;
 use csv::ReaderBuilder;
-use std::fs::File;
-use std::io::{BufReader};
-// use itertools::Itertools;
-// use flate2::GzBuilder;
-// use flate2::Compression;
-use simple_log::info;
-use std::path::Path;
-// use fastq::parse_path;
-// use fastq::each_zipped;
-use simple_log::LogConfigBuilder;
-// use fastq::RefRecord;
-// use crate::fastq::Record;
-// use std::ffi::OsStr;
-// use flate2::{read};
-use std::process::{Command, Stdio};
-// use std::ffi::OsStr;
-// use fasta::read::FastaReader;
-use std::collections::HashMap;
-use seq_io::fasta::{Reader,Record};
- use minimap2::Aligner;
+use simple_log::{info, LogConfigBuilder};
+use rust_htslib::{bam, bam::{Read, Header, Record}, bam::header::HeaderRecord, bam::record::{Cigar, CigarString}, };
+use minimap2::{Aligner, Mapping};
+use noodles::fasta;
 
 
-
-// #[derive(Clone)]
-
-#[allow(dead_code)]
 #[derive(Deserialize)]
 struct HLAalleles {
-    allele: String,
-    index: Option<usize>,
+    allele: String
 }
 
-// // Implement `Display` for `Variant`.
-// impl fmt::Display for Variant {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         // Use `self.number` to refer to each positional data point.
-//         write!(f, "seq: {} start: {} ref_nt: {} query_nt: {} name: {}", self.seq, self.start, self.ref_nt, self.query_nt, self.name)
-//     }
-// }
 
-#[allow(dead_code)]
-#[derive(Debug)]
 struct Params {
     bam: String,
-    genome: String,
+    // genome: String,
     threads: usize,
     alleles_file: String,
     output: String,
@@ -90,7 +48,7 @@ fn load_params() -> Params {
         let bam = params.value_of("bam").unwrap();
         let alleles_file = params.value_of("alleles").unwrap();
         let output = params.value_of("output").unwrap_or("out.bam");
-        let genome = params.value_of("genome").unwrap_or("genome.fasta");
+        // let genome = params.value_of("genome").unwrap_or("genome.fasta");
         let threads = params.value_of("threads").unwrap_or("1");
         let threads = threads.to_string().parse::<usize>().unwrap();
         let mut verbose = true;
@@ -100,15 +58,13 @@ fn load_params() -> Params {
 
         Params{
                 bam: bam.to_string(),
-                genome: genome.to_string(),
+                // genome: genome.to_string(),
                 threads: threads as usize,
                 alleles_file: alleles_file.to_string(),
                 output: output.to_string(),
                 verbose: verbose,
         }
 }
-
-
 
 
 fn read_allelesfile(params: &Params) -> Vec<HLAalleles> {
@@ -127,57 +83,70 @@ fn read_allelesfile(params: &Params) -> Vec<HLAalleles> {
     csvdata.dedup();
     let mut allele_vec: Vec<HLAalleles>  = Vec::new();
     for data in csvdata {
-        let record: HLAalleles = HLAalleles{allele: data, index: None};
+        let record: HLAalleles = HLAalleles{allele: data};
         allele_vec.push(record);
     }
     allele_vec
 }
 
-fn parse_fasta_header (input: String)-> String {
-    let chunks: Vec<_> = input.split(" ").collect();
-    let substring1 = chunks[0].replace(">", "").replace("|", "*");
-    return substring1
-}
 
-#[allow(unused_must_use)]
-fn make_partial_reference (ref_file: String, alleles_query: Vec<HLAalleles>) -> Result<(), Box<dyn Error>>{
-    let mut header: HashMap<String, usize> = HashMap::new();
-    let infile = Path::new(&ref_file);
+/** "make_partial_reference" and its companion function "parse_fasta_header" take a fasta file 
+ * and keep only those entries that match a list of HLA alleles passed as an allele_query. In doing so, 
+ * it also parses the name to remove fasta friendly characters, replacing them with 
+ * characters standard in HLA designations to match the characters in alleles_query.
+ * 
+ * It then writes a new fasta containing only the desired alleles in alleles_query.  It returns the names
+ * of the entries for later writing into a bam header.
+**/
+fn make_partial_reference (ref_file: String, alleles_query: Vec<HLAalleles>) -> Result<Vec<String>, Box<dyn Error>>{
+    let mut names: HashMap<String, usize> = HashMap::new();
     let mut i: usize = 0;
-    let mut reader = Reader::from_path(&infile).unwrap();
-    while let Some(record) = reader.next() {
+    // let mut reader = fasta::indexed_reader::Builder::default().build_from_path(src)?;
+    // TODO: use compressed fasta: https://github.com/zaeleus/noodles/issues/142
+    let mut fasta_reader = File::open(&ref_file)
+        .map(BufReader::new)
+        .map(fasta::Reader::new)?;
+
+    for result in fasta_reader.records() {
         i = i+1;
-        let record = record.unwrap();
-        header.insert(parse_fasta_header(record.id().unwrap().to_string()), i);
-        // println!("{}", record.id().unwrap());
+        let record = result?;
+        names.insert(parse_fasta_header(record.name().to_string()), i);
     }
-    let mut alleles_confirmed: Vec<HLAalleles> = Vec::new();
     let mut simpleindices = Vec::new();
     for data in alleles_query {
-        let matched = header.get(&data.allele);
+        let matched = names.get(&data.allele);
         if matched.is_some(){
             eprintln!("Found: {}", &data.allele);
-            let index = *matched.unwrap();
-            alleles_confirmed.push(HLAalleles{allele: data.allele, index: Some(index)});
-            simpleindices.push(index)
+            simpleindices.push(*matched.unwrap())
         } else{ 
             eprintln!("Could not find: {}", &data.allele)
         };
     }
     i = 0;
     let align_fasta = "data/align.fasta".to_string();
-    let align_fasta = Path::new(&align_fasta);
-    let mut reader = Reader::from_path(&infile).unwrap();
-    // let mut output = io::stdout();
-    let mut output = File::create(align_fasta)?;
-    while let Some(record) = reader.next() {
+    let mut fasta_reader = File::open(&ref_file)
+        .map(BufReader::new)
+        .map(fasta::Reader::new)?;
+    let f = File::create(align_fasta)?;
+    let mut fasta_writer = fasta::writer::Builder::default().build_with_writer(BufWriter::new(f));
+    // let mut output =  fasta::Writer::new(Vec::new());
+    let mut names_out = Vec::new();
+    for result in fasta_reader.records() {
         i = i+1;
-        let record = record.unwrap();
+        let record = result?;
         if simpleindices.contains(&i){
-            record.write_wrap(&mut output, 80);
+            names_out.push(record.name().to_string());
+            let _fw = fasta_writer.write_record(&record);
         }
     }
-    Ok(())
+    Ok(names_out.to_owned())
+}
+
+
+fn parse_fasta_header (input: String)-> String {
+    let chunks: Vec<_> = input.split(" ").collect();
+    let substring1 = chunks[0].replace(">", "").replace("|", "*");
+    return substring1
 }
 
 
@@ -196,165 +165,211 @@ fn main() {
 
     let params = load_params();
         if params.verbose {
-        eprintln!("\n\n\n\nParsing Parameters!\n");
-        eprintln!("\n\n\n\nRunning with {} threads!\n", &params.threads);
+        eprintln!("\nParsing Parameters!\n");
+        eprintln!("\nRunning with {} threads!\n", &params.threads);
     }
     if params.verbose {
-        eprintln!("\n\n\n\nChecking programs and parsing alleles_file!\n");
+        eprintln!("\nChecking programs and parsing alleles_file!\n");
     }
-    // let _prog_test_res = test_progs();
+    let _prog_test_res = test_progs();
     let alleles_query = read_allelesfile(&params);
     
     if params.verbose {
-        eprintln!("\n\n\n\nMatching HLA alleles with known references!\n");
+        eprintln!("\nMatching HLA alleles with known references!\n");
     }
 
     let ref_file = "data/hla_mRNA.fasta".to_string();
     if params.verbose {
-        eprintln!("\n\n\n\nChecking programs, parsing reference file, and making partial reference: {}\n", &ref_file);
+        eprintln!("\nChecking programs, parsing reference file, and making partial reference: {}\n", &ref_file);
     }
-    let _mpr = make_partial_reference(ref_file, alleles_query);
+    let fasta_names = make_partial_reference(ref_file, alleles_query);
     
-    let _ar = align(&params);
+    let _ar = align_and_count(&params, fasta_names.unwrap());
+    let _cu = cleanup("data/align.fasta".to_string());
+    // let _so = sort(&params);
 
 }
+
+fn cleanup(filename: String) -> std::io::Result<()> {
+    fs::remove_file(filename)?;
+    // fs::remove_file("out.bam")?;
+    Ok(())
+}
+
 
 // minimap2 --MD -a $fa -t 8 mutcaller_R1.fq.gz -o Aligned.mm2.sam
 // samtools sort -@ 8 -o Aligned.mm2.sorted.sam Aligned.mm2.sam
 // samtools view -b -@ 8 -o Aligned.mm2.sorted.sam Aligned.mm2.sorted.bam
 // samtools index -@ 8 Aligned.mm2.ssorted.bam
 
-// fn test_progs () -> Result<(), Box<dyn Error>>{
-//     let _output = Command::new("minimap2")
-//                     .arg("-h")
-//                     .stderr(Stdio::piped())
-//                     .stdout(Stdio::piped())
-//                      .output()
-//                      .expect("\n\n*******Failed to execute minimap2*******\n\n");
-//     let _output = Command::new("samtools")
-//                     .arg("-h")
-//                     .stderr(Stdio::piped())
-//                     .stdout(Stdio::piped())
-//                      .output()
-//                      .expect("\n\n*******Failed to execute samtools*******\n\n");
-//     // eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-//     Ok(())
-// }
+fn test_progs () -> Result<(), Box<dyn Error>>{
+    let _output = Command::new("samtools")
+                    .arg("-h")
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::piped())
+                     .output()
+                     .expect("\n\n*******Failed to execute samtools*******\n\n");
+    Ok(())
+}
 
 
-fn align (params: &Params)-> Result<(), Box<dyn Error>> {
+
+
+fn align_and_count (params: &Params, fasta_names: Vec<String>)-> Result<(), Box<dyn Error>> {
     let aligner = Aligner::builder()
         .map_hifi()
         .with_threads(1)
         .with_cigar()
         .with_index("data/align.fasta", None)
         .expect("Unable to build index");
-
-    //  test with baked seq
-    // let seq: Vec<u8> = b"TTTCTTATATGGGGAGAATCTCCTCAGACGCCGAGATGCGGGTCACGGCACCCCGAACCGTCCTCCTGCTGCTCTGGGGGGCAGTGGCCCTGACCGAGACCTGGGCCGGCTCCCACTCCATGAGGTATTTCTACACCGCCATGTCCCGGCCCGGCCGCGGGGAGCCCCGCTTCATCGCAGTGGGCTACGTGGACGACACCCAGTTCGTGAGGTTCGACAGCGACGCCGCGAGTCCGAGGATGGCGCCCCGGGCGCCATGGATAGAGCAGGAGGGGCCGGAGTATTGGGACGGGGAGACACGGAACATGAAGGCCTCCGCGCAGACTTACCGAGAGAACCTGCGGATCGCGCTCCGCTACTACAACCAGAGCGAGGCCGGGTCTCACATCATCCAGGTGATGTATGGCTGCGACGTGGGGCCGGACGGGCGCCTCCTCCGCGGGCATAACCAGTACGCCTACGACGGCAAGGATTACATCGCCCTGAACGAGGACCTGAGCTCCTGGACCGCGGCGGACACGGCGGCTCAGATCACCCAGCGCAAGTGGGAGGCGGCCCGTGTGGCGGAGCAGCGGAGAGCCTACCTGGAGGGCCTGTGCGTGGAGTGGCTCCGCAGATACCTGGAGAACGGGAAGGAGACGCTGCAGCGCGCGGACCCCCCAAAGACACATGTGACCCACCACCCCATCTCTGACCATGAGGCCACCCTGAGGTGCTGGGCCCTGGGCTTCTACCCTGCGGAGATCACACTGACCTGGCAGCGGGATGGCGAGGACCAAACTCAGGACACCGAGCTTGTGGAGACCAGACCAGCAGGAGATAGAACCTTCCAGAAGTGGGCAGCTGTGGTGGTGCCTTCTGGAGAAGAGCAGAGATACACATGCCATGTACAGCATGAGGGGCTGCCAAAGCCCCTCACCCTGAGATGGGAGCCATCTTCCCAATCCACCGTCCCCATCGTGGGCATTGTTGCTGGCCTGGCTGTCCTAGCAGTTGTGGTCATCGGAGCTGTGGTCGCTGCTGTGATGTGTAGGAGGAAGAGCTCAGGTGGAAAAGGAGGGAGCTACTCTCAGGCTGCGTGCAGCGACAGTGCCCAGGGCTCTGATGTGTCTCTCACAGCTTGAAAAGCCTGAGACAGCTGTCTTGTGAGGGACTGAGATGCAGGATTTCTTCACGCCTCCCCTTTGTGACTTCAAGAGCCTCTGGCATCTCTTTCTGCAAAGGCACCTGAATGTGTCTGCGTCCCTGTTAGCCTAATGTGAGGAGGTGGAGAGACAGCCCAACCTTGTGTCCACTGTGACCCCTGTTCCCATGCTGACCTGTGTTTCCTCCCCAGTCATCTTTCTTGTTCCAGAGAGGTGGGGCTGGATGTCTCCATCTCTGTCTCAACTTTATGTGCACTGAGCTGCAACTTCTTACTTCCCTGCTGAAAATAAGAATCTGAATATCAATTTGTTTTCTCAAATATTTGCTATGAGAGGTTGATGGATTAATTAAATAAGTCAATTCCTGGAATTTGAGAGAGCAAATAAAGACCTGAGAACCTTCCAG".to_vec();
-    // eprintln!("{:?}", &seq);
-    // let alignment = aligner
-    //     .map(&seq, false, false, None, None)
-    //     .expect("Unable to align");
-    //     eprintln!("{:?}", alignment);
-
-    let reader = bam::BamReader::from_path(&params.bam, 0).unwrap();
-
-    for record in reader {
-        let seq = record.unwrap().sequence().to_vec();
-        let alignment = aligner
-            .map(&seq, false, false, None, None)
+    // let thresh: u8= 30;
+    let mut bam = bam::Reader::from_path(&params.bam).unwrap();
+    let mut header = Header::from_template(bam.header());
+    for name in &fasta_names {
+        let mut new_header_record = HeaderRecord::new(b"SQ");
+        new_header_record.push_tag(b"SN", &name);
+        new_header_record.push_tag(b"LN", &1000); // TODO: get length correct
+        Header::push_record(& mut header, &new_header_record);
+    }
+        // let mut writer = bam::Writer::from_stdout(& mut header, bam::Format::Sam).unwrap();
+    let mut writer = bam::Writer::from_path(Path::new(&params.output), & mut header, bam::Format::Sam).unwrap();
+    let mut i = 0;
+    // let f = File::create(align_fasta)?;
+    // let mut counts_writer = BufWriter::new(f);
+    let mut count_writer = io::stdout();
+    for r in bam.records() {
+        i = i +1;
+        let record = r.unwrap();
+        let mapping = aligner
+            .map(&record.seq().as_bytes(), false, false, None, None)
             .expect("Unable to align");
-        eprintln!("{:?}", alignment);
+        if mapping.len() > 0 {
+            let first_mapping = mapping.first().unwrap();
+            let mut aligned_record = record.clone();
+            aligned_record = add_mapping_to_record(Some(&first_mapping), aligned_record, &fasta_names);
+            let _w = writer.write(&aligned_record);
+        } else {
+            let _w = writer.write(&record);
+        }
+        // cb = aligned.record.aux(b"CB")
+        // out_writer.write(format!("{} {} {} {} {} {}", &cb, &umi, seqname, ref_pos, vname, _result))
+
     }
     Ok(())
 }
 
-// fn align (params: &Params)-> Result<(), Box<dyn Error>> {
-//     let keep = true;
-//     // let mm_cmd = "/Users/sfurlan/.local/bin/minimap2";
-//     // let mm_args = "-h";
-//     // let mm_args_pre = format!("-a {} -t {} mutcaller_R1.fq.gz | samtools sort -@ {} | samtools view -@ {} -o Aligned.mm2.bam", params.genome.to_string(), params.threads.to_string(), params.threads.to_string(), params.threads.to_string());
-//     // let mm_args_vec = mm_args_pre.split(" ").collect::<Vec<&str>>();
-//     // let mm_args = OsString::new();
-//     // let mm_args = OsString::from(mm_args_pre);
-//     // let mm_cmd = "/Users/sfurlan/.local/bin/minimap2";
-//     // let mm_cmd = "ls";
-//     // let st_cmd = format!("sammtools index -@ {} Aligned.mm2.bam", params.threads.to_string());
-//     // let output = Command::new("echo")
-//     //                  .arg("Hello world")
-//     //                  .output()
-//     //                  .expect("Failed to execute command");
 
-//     // eprintln!("{:?}", &mm_args);
-//     // let output = Command::new(mm_cmd)
-//     //                 .arg(mm_args)
-//     //                  .output()
-//     //                  .expect("Failed to execute minimap2");
-//     // let output = Command::new("/Users/sfurlan/.local/bin/minimap2")
-//     //                 .arg("-h")
-//     //                  .output()
-//     //                  .expect("Failed to execute minimap2");
-//     eprintln!("{}", "Aligning reads using minimap2");
-//     let output = Command::new("minimap2")
-//                     .arg("--MD")
-//                     .arg("-a")
-//                     .arg("data/align.fasta".to_string())
-//                     .arg("-t")
-//                     .arg(params.threads.to_string())
-//                     .arg(params.bam.to_string())
-//                     .arg("-o")
-//                     .arg(params.output.to_string())
-//                     .stderr(Stdio::piped())
-//                     .stdout(Stdio::piped())
-//                      .output()
-//                      .expect("\n\n*******Failed to execute minimap2*******\n\n");
-//     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-//     eprintln!("{}", "Minimap2 complete; Running samtools sort");
-//     let output = Command::new("samtools")
-//                     .arg("sort")
-//                     .arg("-@")
-//                     .arg(params.threads.to_string())
-//                     .arg("-o")
-//                     .arg("Aligned.mm2.sorted.sam")
-//                     .arg(params.output.to_string())
-//                     .stderr(Stdio::piped())
-//                     .stdout(Stdio::piped())
-//                     .output()
-//                      .expect("\n\n*******Failed to execute samtools view*******\n\n");
-//     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-//     eprintln!("{}", "Samtools sort complete; Running samtools view");
-//     let output = Command::new("samtools")
-//                     .arg("view")
-//                     .arg("-b")
-//                     .arg("-@")
-//                     .arg(params.threads.to_string())
-//                     .arg("-o")
-//                     .arg("Aligned.mm2.sorted.bam")
-//                     .arg("Aligned.mm2.sorted.sam")
-//                     .stderr(Stdio::piped())
-//                     .stdout(Stdio::piped())
-//                     .output()
-//                      .expect("\n\n*******Failed to execute samtools sort*******\n\n");
-//     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-//     eprintln!("{}", "Samtools view complete; Running samtools index");
-//     let output = Command::new("samtools")
-//                     .arg("index")
-//                     .arg("-@")
-//                     .arg(params.threads.to_string())
-//                     .arg("Aligned.mm2.sorted.bam")
-//                     .stdout(Stdio::piped())
-//                     .stderr(Stdio::piped())
-//                     .output()
-//                      .expect("\n\n*******Failed to execute samtools index*******\n\n");
-//     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-//     if keep {
-//         fs::remove_file("Aligned.mm2.sorted.sam")?;
-//         fs::remove_file("Aligned.mm2.sam")?;
-//         fs::remove_file("mutcaller_R1.fq.gz")?;
-//     }
-//     Ok(())
-// }
+
+
+pub fn add_mapping_to_record(
+    mapping: Option<&Mapping>, rec: Record, tid_strings: &Vec<String>) -> Record {
+    let mut newrec = Record::new();
+    let qname = rec.qname();
+    let qual =  vec![255; rec.seq().len()];
+    let cigar: Option<CigarString> = mapping
+        .and_then(|m| m.alignment.clone()) // FIXFIX: we probably don't need a clone here
+        .and_then(|a| a.cigar)
+        .map(|c| cigar_to_cigarstr(&c));
+    newrec.set(qname, cigar.as_ref(), &rec.seq().as_bytes(), &qual[..]);
+    match mapping {
+        Some(m) => {
+            // println!("Strand {m:?}");
+            // if m.strand == Strand::Reverse {
+            //     println!("here");
+            //     rec.set_reverse();
+            // }
+            // TODO: set secondary/supplementary flags
+            let tid = tid_strings.iter().position(|r| r == &m.target_name.clone().unwrap()).unwrap() as i32;
+            newrec.set_tid(tid);
+            // /** 
+            //  * query_len
+            //  * query_start
+            //  * query_end
+            //  * Strand
+            //  * target_len
+            //  * target_end
+            //  * match_len
+            //  * block_len
+            //  * md?
+            //  * cs?
+            //  * 
+            //  **/
+            newrec.set_pos(m.target_start as i64);
+            newrec.set_mapq(m.mapq as u8);
+            newrec.set_mpos(-1);
+            newrec.set_mtid(-1);
+            newrec.set_insert_size(0);
+        }
+        None => {
+            newrec.set_unmapped();
+            newrec.set_tid(-1);
+            newrec.set_pos(-1);
+            newrec.set_mapq(255);
+            newrec.set_mpos(-1);
+            newrec.set_mtid(-1);
+            newrec.set_insert_size(-1);
+        }
+    };
+    for aux_data in rec.aux_iter(){
+        let tag = aux_data.unwrap();
+        let _s = newrec.push_aux(tag.0, tag.1);
+    }
+    // TODO: set AUX flags for cs/md if available
+    newrec
+}
+
+
+fn cigar_to_cigarstr(cigar: &Vec<(u32, u8)>) -> CigarString {
+    let op_vec: Vec<Cigar> = cigar
+        .to_owned()
+        .iter()
+        .map(|(len, op)| match op {
+            0 => Cigar::Match(*len),
+            1 => Cigar::Ins(*len),
+            2 => Cigar::Del(*len),
+            3 => Cigar::RefSkip(*len),
+            4 => Cigar::SoftClip(*len),
+            5 => Cigar::HardClip(*len),
+            6 => Cigar::Pad(*len),
+            7 => Cigar::Equal(*len),
+            8 => Cigar::Diff(*len),
+            _ => panic!("Unexpected cigar operation"),
+        })
+        .collect();
+    CigarString(op_vec)
+}
+
+
+fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
+    let keep = false;
+    let output = Command::new("samtools")
+                    .arg("sort")
+                    .arg("-@")
+                    .arg(params.threads.to_string())
+                    .arg("-o")
+                    .arg("out.sorted.bam")
+                    .arg(params.output.to_string())
+                    .stderr(Stdio::piped())
+                    .stdout(Stdio::piped())
+                    .output()
+                     .expect("\n\n*******Failed to execute samtools view*******\n\n");
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+    eprintln!("{}", "Samtools sort complete; Running samtools index");
+    let output = Command::new("samtools")
+                    .arg("index")
+                    .arg("-@")
+                    .arg(params.threads.to_string())
+                    .arg("out.sorted.bam")
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .output()
+                     .expect("\n\n*******Failed to execute samtools index*******\n\n");
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+    if keep {
+        fs::remove_file("out.sorted.bam")?;
+    }
+    Ok(())
+}
 
 
 
