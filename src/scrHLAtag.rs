@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 /**
 
-target/release/scrHLAtag -b data/AML_403_34_HLA.dedup.bam -a data/testhla.tsv
+target/release/scrHLAtag -b data/test.bam -a data/testhla.tsv
 
 **/
 // scrHLA typing, alignment, : single cell rna-based HLA typing and alignment
@@ -185,7 +185,7 @@ fn main() {
     let fasta_names = make_partial_reference(ref_file, alleles_query);
     
     let _ar = align_and_count(&params, fasta_names.unwrap());
-    let _cu = cleanup("data/align.fasta".to_string());
+    // let _cu = cleanup("data/align.fasta".to_string());
     // let _so = sort(&params);
 
 }
@@ -231,8 +231,8 @@ fn align_and_count (params: &Params, fasta_names: Vec<String>)-> Result<(), Box<
         new_header_record.push_tag(b"LN", &1000); // TODO: get length correct
         Header::push_record(& mut header, &new_header_record);
     }
-        // let mut writer = bam::Writer::from_stdout(& mut header, bam::Format::Sam).unwrap();
-    let mut writer = bam::Writer::from_path(Path::new(&params.output), & mut header, bam::Format::Sam).unwrap();
+   let mut writer = bam::Writer::from_stdout(& mut header, bam::Format::Sam).unwrap();
+    // let mut writer = bam::Writer::from_path(Path::new(&params.output), & mut header, bam::Format::Sam).unwrap();
     let mut i = 0;
     // let f = File::create(align_fasta)?;
     // let mut counts_writer = BufWriter::new(f);
@@ -243,6 +243,7 @@ fn align_and_count (params: &Params, fasta_names: Vec<String>)-> Result<(), Box<
         let mapping = aligner
             .map(&record.seq().as_bytes(), false, false, None, None)
             .expect("Unable to align");
+        eprintln!("{:?}", &mapping);
         if mapping.len() > 0 {
             let first_mapping = mapping.first().unwrap();
             let mut aligned_record = record.clone();
@@ -270,7 +271,7 @@ pub fn add_mapping_to_record(
         .and_then(|m| m.alignment.clone()) // FIXFIX: we probably don't need a clone here
         .and_then(|a| a.cigar)
         .map(|c| cigar_to_cigarstr(&c));
-    newrec.set(qname, cigar.as_ref(), &rec.seq().as_bytes(), &qual[..]);
+    newrec.set(qname, cigar.as_ref(), &rec.seq().as_bytes(), &qual[..]); 
     match mapping {
         Some(m) => {
             // println!("Strand {m:?}");
