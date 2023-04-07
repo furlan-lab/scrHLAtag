@@ -1,11 +1,9 @@
-# scrHLAtag
+<img width="150" alt="image" src="scrHLAtag.png">
+
+
+#                       scrHLAtag
 Pipeline for processing scrHLA typing data
 
-<object data="https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf" type="application/pdf" width="300px" height="500px">
-    <embed src="[http://yoursite.com/the.pdf](https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf)">
-        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="[http://yoursite.com/the.pdf](https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf)">Download PDF</a>.</p>
-    </embed>
-</object>
 
 ### Overview
 
@@ -26,7 +24,7 @@ To install scrHLAtag:
 
 ##### Invocation.
 
-Fist users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://hla.alleles.org/nomenclature/index.html).  The alleles_file should look something like this:
+First users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://www.ebi.ac.uk/ipd/imgt/hla/).  The alleles_file should look something like this:
 
 ```sh
 A*30:02:01:01
@@ -40,16 +38,19 @@ DRB1*04:01:01:01
 DRB3*01:62:01:01
 DQB1*04:02:01:01
 ```
+Note: the hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  Current version: 3.50.  Additionally, because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however,=.
 
 To run scrHLAtag simply type:
 
-`scHLAtag -b BAMFILE -a ALLELES_FILE`
+`scHLAtag -b BAMFILE -a ALLELES_FILE -o OUTFOLDER`
 
 
 
 ##### Help menu
 
 ```sh
+scrHLAtag 0.1
+scfurl
 count reads bam files per cb and umi for scrHLA typing
 
 USAGE:
@@ -64,9 +65,19 @@ OPTIONS:
     -a, --hlaalleles <alleles>    table of hla genes to search for (tsv)
     -b, --bam <bam>               input bam
     -c <cb>                       character to parse cell barcode; default = 'CB='
-    
- ```
-
+    -g, --genome <genome>         reference genome
     -o, --out <outfile>           folder for output; default out
     -t, --threads <threads>       threads
     -u <umi>                      character to parse umi; default = 'XM='
+```
+ 
+### Output
+ 
+scrHLAtag will output the following files:
+```sh
+Aligned_mm2_sorted.bam          = minimap2 output bam file, sorted by readname
+Aligned_mm2_sorted.bam.bai      = index for above bam
+counts.txt.gz                   = counts file; columns: CB, UMI, allele, read_count
+align.fa                        = fasta reference file used for minimap2 alignment
+molecules_info.txt              = coming soon! - a file withing alignment metrics for each molecule, CB, UMI, allele, CIGAR, NM, de (see minimap2 manual for more info)
+```
