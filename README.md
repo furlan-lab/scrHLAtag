@@ -4,11 +4,6 @@
 #                       scrHLAtag
 Pipeline for processing scrHLA typing data
 
-<object data="https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf" type="application/pdf" width="300px" height="500px">
-    <embed src="[http://yoursite.com/the.pdf](https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf)">
-        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="[http://yoursite.com/the.pdf](https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf)">Download PDF</a>.</p>
-    </embed>
-</object>
 
 ### Overview
 
