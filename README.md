@@ -65,7 +65,6 @@ OPTIONS:
     -a, --hlaalleles <alleles>    table of hla genes to search for (tsv)
     -b, --bam <bam>               input bam
     -c <cb>                       character to parse cell barcode; default = 'CB='
-    -g, --genome <genome>         reference genome
     -o, --out <outfile>           folder for output; default out
     -t, --threads <threads>       threads
     -u <umi>                      character to parse umi; default = 'XM='
