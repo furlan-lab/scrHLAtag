@@ -29,7 +29,7 @@ To install scrHLAtag:
 
 ##### Invocation.
 
-Fist users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://hla.alleles.org/nomenclature/index.html).  The alleles_file should look something like this:
+First users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://hla.alleles.org/nomenclature/index.html).  The alleles_file should look something like this:
 
 ```sh
 A*30:02:01:01
