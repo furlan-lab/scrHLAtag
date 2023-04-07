@@ -1,6 +1,12 @@
 # scrHLAtag
 Pipeline for processing scrHLA typing data
 
+<object data="https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf" type="application/pdf" width="300px" height="500px">
+    <embed src="[http://yoursite.com/the.pdf](https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf)">
+        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="[http://yoursite.com/the.pdf](https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf)">Download PDF</a>.</p>
+    </embed>
+</object>
+
 ### Overview
 
 scrHLAtag is command line software meant to process long-read (PacBio) sequencing data generated from 10X Genomics 5 prime libraries.  Using scrHLAtag, you can supply relevant HLA alleles, and obtain a counts file of the number of reads that map to your HLA query and their associated cell-barcodes and umis.  scrHLAtag takes as input a BAM file that has been processed using the single cell IsoSeq3 pipeline through the dedup stage.
