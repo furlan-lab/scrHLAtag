@@ -26,7 +26,7 @@ args:
         short: o
         takes_value: true
         required: false
-        help: outfile name; default out.bam
+        help: folder for output; default out
     - threads:
         long: threads
         short: t
@@ -44,6 +44,7 @@ args:
         takes_value: true
         required: false
     - verbose:
+        long: verbose
         short: v
         help: verbose
         takes_value: false
