@@ -38,7 +38,7 @@ DRB1*04:01:01:01
 DRB3*01:62:01:01
 DQB1*04:02:01:01
 ```
-Note: the hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  Current version: 3.50.  Additionally, because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however,=.
+Note: the hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  Current version: 3.50.  Additionally, because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however.
 
 To run scrHLAtag simply type:
 
