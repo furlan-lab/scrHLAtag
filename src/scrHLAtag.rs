@@ -1,4 +1,3 @@
-// #![allow(non_snake_case)]
 /**
 
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
@@ -27,6 +26,10 @@ use flate2::{Compression, GzBuilder};
 use fastq::{OwnedRecord, Record};
 use itertools::Itertools;
 use kseq::parse_path;
+use simple_log::LogConfigBuilder;
+use simple_log::{info, warn, error};
+
+
 
 
 #[derive(Deserialize)]
@@ -37,7 +40,6 @@ pub struct HLAalleles {
 
 pub struct Params {
     pub bam: String,
-    // genome: String,
     pub threads: usize,
     pub alleles_file: String,
     pub output: Box<Path>,
@@ -55,7 +57,6 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
     let bam = params.value_of("bam").unwrap().to_string();
     let alleles_file = params.value_of("alleles").unwrap().to_string();
     let output = params.value_of("output").unwrap_or("out").to_string();
-    // let genome = params.value_of("genome").unwrap_or("genome.fasta");
     let threads = params.value_of("threads").unwrap_or("1").to_string().parse::<usize>().unwrap();
     let mut verbose = false;
     if params.is_present("verbose") {
@@ -64,26 +65,34 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
     let package_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let hla_path = package_dir.join("data/hla_mRNA.fasta.gz");
     let hla_ref = hla_path.to_str().unwrap();
-    
-
-    // static hla_data = PROJECT_DIR.get_file("data/hla_mRNA.fasta.gz").unwrap();
-
+    let _cu = cleanup(&Path::new(&output).join("scrHLAtag.log"), false);
+    let config = LogConfigBuilder::builder()
+        .path(Path::new(&output).join("scrHLAtag.log").to_string_lossy())
+        .size(1 * 100)
+        .roll_count(10)
+        .time_format("%Y-%m-%d %H:%M:%S.%f") //E.g:%H:%M:%S.%f
+        .level("info")
+        .output_file()
+        .build();
+    let _ = simple_log::new(config);
+    info!("\t\t\tStarting!");
+    info!("\t\t\tCurrent working directory: '{}'", wdir);
     if verbose {
         eprintln!("\n\nCurrent working directory: '{}'", wdir);
     }
-    // assert!(!Path::new(&output).exists());
     let outpath = Path::new(&output);
-    // let mut abs_outpath = "";
-    // let mut abs_outpath = Path::new("dummy");
     if outpath.is_relative(){
         let a1 = Path::new(wdir).join(&output);
         let abs_outpath = a1.to_str().unwrap();
         if outpath.exists() {
+                info!("\t\t\tFound existing output directory: '{}'", &abs_outpath);
+                warn!("\t\t\t{}", "Existing data in this folder could be lost!!!");
                if verbose {
                     eprintln!("Found existing output directory: '{}'", &abs_outpath);
-                    eprintln!("\t{}", "Warning: data in this folder could be lost!!!");
+                    eprintln!("\t{}", "Existing data in this folder could be lost!!!");
                 }
         } else {
+            info!("\t\tCreating output directory: '{}'", &abs_outpath);
             if verbose {
                 eprintln!("Creating output directory: '{}'", &abs_outpath);
             }
@@ -93,21 +102,22 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
     } else {
         let abs_outpath = outpath.to_str().unwrap();
         if outpath.exists() {
+            info!("\t\tFound existing output directory: '{}'", &abs_outpath);
+            warn!("\t\t{}", "Existing data in this folder could be lost!!!");
             if verbose {
                 eprintln!("Found existing output directory: '{}'", &abs_outpath);
                 eprintln!("\t{}", "Existing data in this folder could be lost!!!");
             }
         } else {
+            info!("\t\tCreating output directory: '{}'", &abs_outpath);
             if verbose {
                 eprintln!("Creating output directory: '{}'", &abs_outpath);
             }
             fs::create_dir(outpath)?;
         }
     }
-
     Ok(Params{
             bam: bam,
-            // genome: genome.to_string(),
             threads: threads as usize,
             alleles_file: alleles_file,
             output: outpath.into(),
@@ -118,6 +128,7 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
 
 
 pub fn read_allelesfile(params: &Params) -> Vec<HLAalleles> {
+    info!("\t\tOpening alleles file: '{}'", &params.alleles_file.to_string());
     if params.verbose {
         eprintln!("Opening alleles file: '{}'", &params.alleles_file.to_string());
     }
@@ -153,6 +164,7 @@ pub fn read_allelesfile(params: &Params) -> Vec<HLAalleles> {
 pub fn make_partial_reference (alleles_query: Vec<HLAalleles>, params: &Params) -> Result<Vec<String>, Box<dyn Error>>{
     let mut names: HashMap<String, usize> = HashMap::new();
     let mut i: usize = 0;
+    info!("\t\tRead HLA reference file: '{}'", &params.hla_ref);
     if params.verbose {
         eprintln!("Read HLA reference file: '{}'", &params.hla_ref);
     }
@@ -167,11 +179,13 @@ pub fn make_partial_reference (alleles_query: Vec<HLAalleles>, params: &Params) 
     for data in alleles_query {
         let matched = names.get(&data.allele);
         if matched.is_some(){
+            info!("\t\t\tFound: {}", &data.allele);
             if params.verbose {
                 eprintln!("\tFound: {}", &data.allele);
             }
             simpleindices.push(*matched.unwrap())
         } else{ 
+            warn!("\t\tCould not find: {}", &data.allele);
             if params.verbose {
                 eprintln!("Could not find: {}", &data.allele)
             }
@@ -208,12 +222,6 @@ fn parse_fasta_header (input: String)-> String {
 }
 
 
-
-// minimap2 --MD -a $fa -t 8 mutcaller_R1.fq.gz -o Aligned.mm2.sam
-// samtools sort -@ 8 -o Aligned.mm2.sorted.sam Aligned.mm2.sam
-// samtools view -b -@ 8 -o Aligned.mm2.sorted.sam Aligned.mm2.sorted.bam
-// samtools index -@ 8 Aligned.mm2.ssorted.bam
-
 pub fn test_progs (software: String) -> Result<(), Box<dyn Error>>{
     let _output = Command::new(software.clone())
                     .arg("-h")
@@ -224,7 +232,15 @@ pub fn test_progs (software: String) -> Result<(), Box<dyn Error>>{
     Ok(())
 }
 
-// #[allow(unused_variables)]
+fn calc_threads(params: &Params) -> u16 {
+    if params.threads>2{
+        (params.threads/2).try_into().unwrap()
+    } else {
+        0
+    }
+
+}
+
 #[allow(unused_assignments)]
 pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
 
@@ -239,7 +255,7 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
     let mut err_count: usize = 0;
 
     // bam reader
-    let bam_reader = BamReader::from_path(bam_fn, 0).unwrap();
+    let bam_reader = BamReader::from_path(bam_fn, calc_threads(&params)).unwrap();
     
     // fastq writer;
     let _file = match File::create(&fastq_path) {
@@ -301,6 +317,7 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
 
         let _nr = new_record.write(&mut writer);
     }
+    info!("\t\t\tTotal reads processed: {}\tReads with errors: {}", total_count, err_count);
     if params.verbose {
         eprintln!("\tTotal reads processed: {}\n\tReads with errors: {}\n", total_count, err_count);
     }
@@ -311,15 +328,18 @@ pub fn align (params: &Params)-> Result<(), Box<dyn Error>> {
     let align_fasta_path = params.output.join("align.fa");
     let align_fasta = align_fasta_path.to_str().unwrap();
     if !align_fasta_path.exists() {
+        error!("\t\tAlignment fasta not found at: {}", align_fasta);
         panic!("Alignment fasta not found at: {}", align_fasta);
     }
     let fastq_path = params.output.join("fastq.fq.gz");
     let fastq_file = fastq_path.to_str().unwrap();
     if !fastq_path.exists() {
+        error!("\t\tAlignment fastq not found at: {}", fastq_file);
         panic!("Alignment fastq not found at: {}", fastq_file);
     }
     let sam_path = params.output.join("Aligned_mm2.sam");
     let sam_file = sam_path.to_str().unwrap();
+    info!("\t\t{}", "Aligning reads using minimap2 - Output below:");
     if params.verbose {
         eprintln!("{}", "Aligning reads using minimap2 - Output below:\n");
     }
@@ -341,6 +361,7 @@ pub fn align (params: &Params)-> Result<(), Box<dyn Error>> {
                     .stdout(Stdio::piped())
                      .output()
                      .expect("\n\n*******Failed to execute minimap2*******\n\n");
+    info!("{}", String::from_utf8_lossy(&output.stderr));
     if params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
@@ -352,12 +373,14 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
     let sam_path = params.output.join("Aligned_mm2.sam");
     let sam_file = sam_path.to_str().unwrap();
     if !sam_path.exists() {
+        error!("\t\tSAM not found at: {}", sam_file);
         panic!("SAM not found at: {}", sam_file);
     }
     let ssam_path = params.output.join("Aligned_mm2_sorted.sam");
     let ssam_file = ssam_path.to_str().unwrap();
     let bam_path = params.output.join("Aligned_mm2_sorted.bam");
     let bam_file = bam_path.to_str().unwrap();
+    info!("\t\t{}", "Minimap2 complete; Running samtools sort");
     if params.verbose {
         eprintln!("{}", "Minimap2 complete; Running samtools sort");
     }
@@ -372,13 +395,18 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
                     .stdout(Stdio::piped())
                     .output()
                      .expect("\n\n*******Failed to execute samtools view*******\n\n");
+    info!("\t\t{}", String::from_utf8_lossy(&output.stderr));
     if params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        
     }
+    info!("\t\t{}", "Samtools sort complete; Running samtools view");
     if params.verbose {
         eprintln!("{}", "Samtools sort complete; Running samtools view");
     }
+    
     if !ssam_path.exists() {
+        error!("\t\tSorted SAM not found at: {}", ssam_file);
         panic!("Sorted SAM not found at: {}", ssam_file);
     }
     let output = Command::new("samtools")
@@ -393,14 +421,17 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
                     .stdout(Stdio::piped())
                     .output()
                      .expect("\n\n*******Failed to execute samtools sort*******\n\n");
+    info!("\t\t{}", String::from_utf8_lossy(&output.stderr));
     if params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
+    info!("\t\t{}", "Samtools view complete; Running samtools index");
     if params.verbose {
         eprintln!("{}", "Samtools view complete; Running samtools index");
     }
     if !bam_path.exists() {
-        panic!("Sorted SAM not found at: {}", bam_file);
+        error!("Sorted SAM not found at: {}", bam_file);
+        panic!("\t\tSorted SAM not found at: {}", bam_file);
     }
     let output = Command::new("samtools")
                     .arg("index")
@@ -418,6 +449,7 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
 }
 
 pub fn count(params: &Params) -> Vec<Vec<u8>>{
+    info!("\t\tCounting reads:");
     if params.verbose {
         eprintln!("Counting reads:");
     }
@@ -468,6 +500,8 @@ pub fn count(params: &Params) -> Vec<Vec<u8>>{
                 data.push(format!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]));
         }
     }
+    info!("\t\t\tTotal reads processed: {}\tReads with errors: {}", total_count, err_count);
+    info!("\t\t\tUnmapped reads: {}\tMapped reads: {}", unmapped_count, mapped_count);
     if params.verbose {
         eprintln!("\tTotal reads processed: {}\n\tReads with errors: {}\n\tUnmapped reads: {}\n\tMapped reads: {}\n", total_count, err_count, unmapped_count, mapped_count);
     }
@@ -484,6 +518,7 @@ pub fn count(params: &Params) -> Vec<Vec<u8>>{
 pub fn write_counts (count_vec: Vec<Vec<u8>>, params: &Params) -> Result<(), Box<dyn Error>> {
         let counts_path = params.output.join("counts.txt.gz");
         let counts_file = counts_path.to_str().unwrap();
+        info!("\t\tWriting counts to : '{}'", counts_file);
         if params.verbose{
             eprintln!("Writing counts to : '{}'\n", counts_file);
         }
@@ -499,11 +534,19 @@ pub fn write_counts (count_vec: Vec<Vec<u8>>, params: &Params) -> Result<(), Box
 }
 
 
-pub fn cleanup(filename: &Path) -> std::io::Result<()> {
-    fs::remove_file(filename.to_str().unwrap())?;
+pub fn cleanup(filename: &Path, warn: bool) -> std::io::Result<()> {
+    if Path::new(filename).exists(){
+        fs::remove_file(filename.to_str().unwrap())?;
+        Ok(())
+    }else {
+        if warn{
+            warn!("\t\tFile does not exist: '{:?}'", filename);
+        }
+        Ok(())
+    }
     // fs::remove_file("out.bam")?;
-    Ok(())
 }
+
 
 
 fn remove_whitespace( s: &str) ->  String{

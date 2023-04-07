@@ -1,5 +1,5 @@
 name: scrHLAtag
-version: "0.1"
+version: "0.0.1"
 author: scfurl
 about: count reads bam files per cb and umi for scrHLA typing
 args:
@@ -15,12 +15,6 @@ args:
         takes_value: true
         required: false
         help: table of hla genes to search for (tsv)
-    - genome:
-        long: genome
-        short: g
-        takes_value: true
-        required: false
-        help: reference genome
     - outfile:
         long: out
         short: o
@@ -39,7 +33,7 @@ args:
         takes_value: true
         required: false
     - umi:
-        short: umi
+        short: u
         help: character to parse umi; default = 'XM='
         takes_value: true
         required: false
