@@ -79,5 +79,5 @@ Aligned_mm2_sorted.bam          = minimap2 output bam file, sorted by readname
 Aligned_mm2_sorted.bam.bai      = index for above bam
 counts.txt.gz                   = counts file; columns: CB, UMI, allele, read_count
 align.fa                        = fasta reference file used for minimap2 alignment
-molecules_info.txt              = coming soon! - a file withing alignment metrics for each molecule, CB, UMI, allele, CIGAR, NM, de (see minimap2 manual for more info)
+molecules_info.txt.gz           = a file withing alignment metrics for each molecule; columns: CB, UMI, allele, CIGAR, NM, de (see minimap2 manual for more info)
 ```
