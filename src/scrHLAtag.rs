@@ -61,7 +61,7 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
     let params = App::from_yaml(yaml).get_matches();
     // eprintln!("{:?}", params);
     let bam = params.value_of("bam").unwrap().to_string();
-    let alleles_file = params.value_of("alleles").unwrap().to_string();
+    let alleles_file = params.value_of("alleles_file").unwrap().to_string();
     let cb = params.value_of("c").unwrap_or("CB").to_string();
     let umi = params.value_of("u").unwrap_or("XM").to_string();
     let output = params.value_of("output").unwrap_or("out").to_string();

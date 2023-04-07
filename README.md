@@ -49,12 +49,12 @@ To run scrHLAtag simply type:
 ##### Help menu
 
 ```sh
-scrHLAtag 0.1
-scfurl
-count reads bam files per cb and umi for scrHLA typing
+scrHLAtag 0.0.2
+copyright Scott Furlan
+scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell libraries
 
 USAGE:
-    scrHLAtag [FLAGS] [OPTIONS] --bam <bam>
+    scrHLAtag [FLAGS] [OPTIONS] --alleles <alleles_file> --bam <bam>
 
 FLAGS:
     -h, --help       Prints help information
@@ -62,12 +62,12 @@ FLAGS:
     -v, --verbose    verbose
 
 OPTIONS:
-    -a, --hlaalleles <alleles>    table of hla genes to search for (tsv)
-    -b, --bam <bam>               input bam
-    -c <cb>                       character to parse cell barcode; default = 'CB='
-    -o, --out <outfile>           folder for output; default out
-    -t, --threads <threads>       threads
-    -u <umi>                      character to parse umi; default = 'XM='
+    -a, --alleles <alleles_file>    table of hla genes to search for (tsv file)
+    -b, --bam <bam>                 input bam
+    -c, --cellbarcode <cb>          character to parse cell barcode; default = 'CB'
+    -o, --out <outfile>             folder for output; default 'out'
+    -t, --threads <threads>         threads
+    -u, --umi <umi>                 character to parse umi; default = 'XM'
 ```
  
 ### Output
