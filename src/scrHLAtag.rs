@@ -17,6 +17,7 @@ extern crate bam;
 extern crate fastq;
 extern crate kseq;
 
+
 use std::{env, io::Write, str, fs, fs::File, error::Error, path::{Path, PathBuf}, collections::HashMap, process::{Command, Stdio }};
 use std::io::{ BufReader, BufWriter};
 use clap::{App, load_yaml};
@@ -30,6 +31,7 @@ use itertools::Itertools;
 use kseq::parse_path;
 use simple_log::LogConfigBuilder;
 use simple_log::{info, warn, error};
+
 
 
 
@@ -256,7 +258,11 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
     let split = "|BARCODE=".to_string();
     let fastq_path = &params.output.join("fastq.fq.gz");
     let bam_fn = Path::new(&params.bam);
-
+    // let cb_b: [u8; 2] = clone_into_array(&params.cb_tag.as_bytes().to_vec()[0..1]);
+    let binding = params.cb_tag.as_bytes().to_vec();
+    let cb_b = pop2(&binding);
+    let binding = params.umi_tag.as_bytes().to_vec();
+    let umi_b = pop2(&binding);
     // set counters
     let mut total_count: usize = 0;
     // let mut nfound_count: usize = 0;
@@ -295,7 +301,8 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
 
         // get cb and umi
         // TODO: Parameterize this
-        match rec.tags().get(b"CB") {
+
+        match rec.tags().get(&cb_b) {
             Some( bam::record::tags::TagValue::String(cba, _)) => {
                 cb = str::from_utf8(&cba).unwrap().to_string();
                 // eprintln!("{:?}", &cb);
@@ -305,7 +312,7 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
                 continue
             },
         }
-        match rec.tags().get(b"XM") {
+        match rec.tags().get(&umi_b) {
             Some( bam::record::tags::TagValue::String(uba, _)) => {
                 umi = str::from_utf8(&uba).unwrap().to_string();
                 // eprintln!("{:?}", &umi);
@@ -609,6 +616,21 @@ pub fn cleanup(filename: &Path, warn: bool) -> std::io::Result<()> {
         Ok(())
     }
     // fs::remove_file("out.bam")?;
+}
+
+// fn clone_into_array<A, T>(slice: &[T]) -> A
+// where
+//     A: Default + AsMut<[T]>,
+//     T: Clone,
+// {
+//     let mut a = A::default();
+//     <A as AsMut<[T]>>::as_mut(&mut a).clone_from_slice(slice);
+//     a
+// }
+
+
+fn pop2(barry: &[u8]) -> &[u8; 2] {
+    array_ref!(barry, 0, 2)
 }
 
 
