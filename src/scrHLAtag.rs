@@ -106,7 +106,6 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
             }
             fs::create_dir(outpath)?;
         }
-        // eprintln!("Abspath? {:?}", &abs_outpath.to_str().unwrap());
     } else {
         let abs_outpath = outpath.to_str().unwrap();
         if outpath.exists() {
@@ -263,15 +262,15 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
     let cb_b = pop2(&binding);
     let binding = params.umi_tag.as_bytes().to_vec();
     let umi_b = pop2(&binding);
+
     // set counters
     let mut total_count: usize = 0;
-    // let mut nfound_count: usize = 0;
     let mut err_count: usize = 0;
 
-    // bam reader
+    // make bam reader
     let bam_reader = BamReader::from_path(bam_fn, calc_threads(&params)).unwrap();
     
-    // fastq writer;
+    // make fastq writer;
     let _file = match File::create(&fastq_path) {
         Err(_why) => panic!("couldn't open {}", fastq_path.display()),
         Ok(file) => file,
@@ -287,10 +286,10 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
         let mut umi: String = Default::default();
         total_count+=1;
         let rec = record.as_ref().unwrap();
+
         // get name
         let old_readname = match str::from_utf8(rec.name()) {
             Ok(value) => {
-                // eprintln!("{:?}", value);
                 remove_whitespace(value)
             },
             Err(_e) => {
@@ -300,8 +299,6 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
         };
 
         // get cb and umi
-        // TODO: Parameterize this
-
         match rec.tags().get(&cb_b) {
             Some( bam::record::tags::TagValue::String(cba, _)) => {
                 cb = str::from_utf8(&cba).unwrap().to_string();
@@ -544,8 +541,7 @@ pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
                             0.0
                         },
                 };
-                // eprintln!("hi: {} {} {} {} {} {} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.cigar(), nm_tag, as_tag, s1_tag, de_tag);
-                // columns cb, umi, seqname, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence)
+                // columns cb, umi, seqname, star, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence)
                 molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {}\n", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
                 
         }
@@ -615,18 +611,8 @@ pub fn cleanup(filename: &Path, warn: bool) -> std::io::Result<()> {
         }
         Ok(())
     }
-    // fs::remove_file("out.bam")?;
 }
 
-// fn clone_into_array<A, T>(slice: &[T]) -> A
-// where
-//     A: Default + AsMut<[T]>,
-//     T: Clone,
-// {
-//     let mut a = A::default();
-//     <A as AsMut<[T]>>::as_mut(&mut a).clone_from_slice(slice);
-//     a
-// }
 
 
 fn pop2(barry: &[u8]) -> &[u8; 2] {
