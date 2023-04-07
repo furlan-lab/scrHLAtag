@@ -60,7 +60,7 @@ fn main() {
     let _fq = make_fastq(&params);
     let _al = align(&params);
     let _so = sort(&params);
-    let counts = count(&params);
+    let (counts, molecule_info) = count(&params);
     // let _ar = align_and_count(&params, fasta_names.unwrap());  
 
     if params.verbose {
@@ -71,6 +71,7 @@ fn main() {
     let _cu = cleanup(&params.output.join("Aligned_mm2_sorted.sam"), true);
     let _cu = cleanup(&params.output.join("fastq.fq.gz"), true);
     let _wc = write_counts(counts, &params);
+    let _wc = write_molecules(molecule_info, &params);
     // let _so = sort(&params);
 
     if params.verbose {

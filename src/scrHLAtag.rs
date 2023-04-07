@@ -1,6 +1,8 @@
 /**
 
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
+~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_dedup.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
+
 
 **/
 // scrHLA typing, alignment, : single cell rna-based HLA typing and alignment
@@ -21,7 +23,7 @@ use clap::{App, load_yaml};
 use serde::Deserialize;
 use csv::ReaderBuilder;
 use noodles_fasta::{self as fasta, record::{Definition, Sequence}};
-use bam::{BamReader};
+use bam::{BamReader, record::tags::TagValue};
 use flate2::{Compression, GzBuilder};
 use fastq::{OwnedRecord, Record};
 use itertools::Itertools;
@@ -448,7 +450,7 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn count(params: &Params) -> Vec<Vec<u8>>{
+pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
     info!("\t\tCounting reads:");
     if params.verbose {
         eprintln!("Counting reads:");
@@ -474,6 +476,7 @@ pub fn count(params: &Params) -> Vec<Vec<u8>>{
 
     // count
     let mut data = Vec::new();
+    let mut molecule_data: Vec<String> = Vec::new();
     for record in bam_reader{
         total_count+=1;
         let readname = match str::from_utf8(record.as_ref().unwrap().name()) {
@@ -495,9 +498,43 @@ pub fn count(params: &Params) -> Vec<Vec<u8>>{
                 continue;
         } else {
                 mapped_count+=1;
-                let index = record.as_ref().unwrap().ref_id() as usize;
+                let rec = record.as_ref().unwrap();
+                let index = rec.ref_id() as usize;
                 // eprintln!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]);
                 data.push(format!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]));
+
+                let nm_tag = match rec.tags().get(b"NM") {
+                    Some(TagValue::Int(value, _)) => value,
+                    _ => {
+                            warn!("NM tag not returned correctly for read {:?}", str::from_utf8(rec.name()).unwrap());
+                            -1
+                        },
+                    };
+                let as_tag = match rec.tags().get(b"AS") {
+                    Some(TagValue::Int(value, _)) => value,
+                    _ => {
+                            warn!("AS tag not returned correctly for read {:?}", rec.name());
+                            0
+                        },
+                };
+                let s1_tag = match rec.tags().get(b"s1") {
+                    Some(TagValue::Int(value, _)) => value,
+                    _ => {
+                            warn!("AS tag not returned correctly for read {:?}", rec.name());
+                            0
+                        },
+                };
+                let de_tag = match rec.tags().get(b"de") {
+                    Some(TagValue::Float(value)) => value,
+                    _ => {
+                            warn!("AS tag not returned correctly for read {:?}", rec.name());
+                            0.0
+                        },
+                };
+                // eprintln!("hi: {} {} {} {} {} {} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.cigar(), nm_tag, as_tag, s1_tag, de_tag);
+                // columns cb, umi, seqname, cigar, NM, AS, chaining_score, de (per base sequence divergence)
+                molecule_data.push(format!("{} {} {} {} {} {} {} {}\n", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
+                
         }
     }
     info!("\t\t\tTotal reads processed: {}\tReads with errors: {}", total_count, err_count);
@@ -512,7 +549,9 @@ pub fn count(params: &Params) -> Vec<Vec<u8>>{
        let count_str = record+&" ".to_owned()+&(count.to_string()+&"\n".to_owned());
         out_vec.push(count_str.as_bytes().to_owned());
     }
-    return out_vec;
+    molecule_data.sort();
+
+    return (out_vec, molecule_data);
 }
 
 pub fn write_counts (count_vec: Vec<Vec<u8>>, params: &Params) -> Result<(), Box<dyn Error>> {
@@ -532,6 +571,25 @@ pub fn write_counts (count_vec: Vec<Vec<u8>>, params: &Params) -> Result<(), Box
         gz.finish()?;
         Ok(())
 }
+
+pub fn write_molecules (molecule_vec: Vec<String>, params: &Params) -> Result<(), Box<dyn Error>> {
+        let molecule_path = params.output.join("molecule_txt.gz");
+        let molecule_file = molecule_path.to_str().unwrap();
+        info!("\t\tWriting counts to : '{}'", molecule_file);
+        if params.verbose{
+            eprintln!("Writing counts to : '{}'\n", molecule_file);
+        }
+        let f = File::create(molecule_file)?;
+        let mut gz = GzBuilder::new()
+                        .filename(molecule_file)
+                        .write(f, Compression::default());
+        for result in molecule_vec {
+                gz.write_all(&result.as_bytes())?;
+        }
+        gz.finish()?;
+        Ok(())
+}
+
 
 
 pub fn cleanup(filename: &Path, warn: bool) -> std::io::Result<()> {
