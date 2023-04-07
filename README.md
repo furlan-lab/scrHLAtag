@@ -49,6 +49,8 @@ To run scrHLAtag simply type:
 ##### Help menu
 
 ```sh
+scrHLAtag 0.1
+scfurl
 count reads bam files per cb and umi for scrHLA typing
 
 USAGE:
@@ -63,19 +65,19 @@ OPTIONS:
     -a, --hlaalleles <alleles>    table of hla genes to search for (tsv)
     -b, --bam <bam>               input bam
     -c <cb>                       character to parse cell barcode; default = 'CB='
+    -g, --genome <genome>         reference genome
+    -o, --out <outfile>           folder for output; default out
+    -t, --threads <threads>       threads
+    -u <umi>                      character to parse umi; default = 'XM='
+```
  
+### Output
  
- ### Output
- 
- scrHLAtag will output the following files:
- ```sh
+scrHLAtag will output the following files:
+```sh
 Aligned_mm2_sorted.bam          = minimap2 output bam file, sorted by readname
 Aligned_mm2_sorted.bam.bai      = index for above bam
 counts.txt.gz                   = counts file; columns: CB, UMI, allele, read_count
 align.fa                        = fasta reference file used for minimap2 alignment
 molecules_info.txt              = coming soon! - a file withing alignment metrics for each molecule, CB, UMI, allele, CIGAR, NM, de (see minimap2 manual for more info)
- ```
-
-    -o, --out <outfile>           folder for output; default out
-    -t, --threads <threads>       threads
-    -u <umi>                      character to parse umi; default = 'XM='
+```
