@@ -24,7 +24,7 @@ To install scrHLAtag:
 
 ##### Invocation.
 
-First users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://hla.alleles.org/nomenclature/index.html).  The alleles_file should look something like this:
+First users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://www.ebi.ac.uk/ipd/imgt/hla/).  The alleles_file should look something like this:
 
 ```sh
 A*30:02:01:01
@@ -38,6 +38,7 @@ DRB1*04:01:01:01
 DRB3*01:62:01:01
 DQB1*04:02:01:01
 ```
+Note: the hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  Current version: 3.50.  Additionally, because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however,=.
 
 To run scrHLAtag simply type:
 
@@ -62,7 +63,17 @@ OPTIONS:
     -a, --hlaalleles <alleles>    table of hla genes to search for (tsv)
     -b, --bam <bam>               input bam
     -c <cb>                       character to parse cell barcode; default = 'CB='
-    
+ 
+ 
+ ### Output
+ 
+ scrHLAtag will output the following files:
+ ```sh
+Aligned_mm2_sorted.bam          = minimap2 output bam file, sorted by readname
+Aligned_mm2_sorted.bam.bai      = index for above bam
+counts.txt.gz                   = counts file; columns: CB, UMI, allele, read_count
+align.fa                        = fasta reference file used for minimap2 alignment
+molecules_info.txt              = coming soon! - a file withing alignment metrics for each molecule, CB, UMI, allele, CIGAR, NM, de (see minimap2 manual for more info)
  ```
 
     -o, --out <outfile>           folder for output; default out
