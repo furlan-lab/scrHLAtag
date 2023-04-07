@@ -81,4 +81,14 @@ counts.txt.gz                   = counts file; columns: CB, UMI, allele, read_co
 align.fa                        = fasta reference file used for minimap2 alignment
 molecules_info.txt.gz           = a file withing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de)
 ```
-See minimap2 manual for a discussion of the molecule_info metrics
+See minimap2 manual (https://lh3.github.io/minimap2/minimap2.html) for a discussion of the molecule_info metrics
+
+
+
+
+
+
+
+
+
+
