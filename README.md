@@ -1,4 +1,7 @@
-# scrHLAtag
+<img width="500" alt="image" src="scrHLAtag.png">
+
+
+#                       scrHLAtag
 Pipeline for processing scrHLA typing data
 
 <object data="https://github.com/furlan-lab/scrHLAtag/scrHLAtag.pdf" type="application/pdf" width="300px" height="500px">
