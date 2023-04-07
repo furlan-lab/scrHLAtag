@@ -1,4 +1,4 @@
-<img width="500" alt="image" src="scrHLAtag.png">
+<img width="150" alt="image" src="scrHLAtag.png">
 
 
 #                       scrHLAtag
