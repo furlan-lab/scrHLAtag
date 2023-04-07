@@ -13,23 +13,43 @@ scrHLAtag is a command line tool written in Rust for processing long-read (PacBi
 
 ### Installation
 
-scrHLAtag is written in Rust.  To install the rust compiler go to https://www.rust-lang.org/tools/install.  scrHLAtag requires two additional tools be available on the command line, minimap2 (ref) and samtools (ref). 
+scrHLAtag is written in Rust.  To install the rust compiler go to https://www.rust-lang.org/tools/install.  scrHLAtag requires two additional tools be available on the command line, minimap2 (https://github.com/lh3/minimap2) and samtools (https://samtools.github.io). 
 
 To install scrHLAtag:
 1. clone the repository by typing `https://github.com/furlan-lab/scrHLAtag.git` from the location you want to build from
-2. build by entring `cargo build release`
-3. the build process will create a self contained binary executable file in targets/release directory called `scrHLAtag`
-4. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
+2. enter the cloned repo by typing `cd scrHLAtag`
+3. build by typing `cargo build release`
+4. the build process will create a self contained binary executable file in targets/release directory called `scrHLAtag`
+5. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
 ### Usage
 
 ##### Invocation.
 
-Fist users will generate a simple text files with the HLA alleles of interest. The names of the alleles should be taken from the Anthony Nolan registry (link)
+Fist users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://hla.alleles.org/nomenclature/index.html).  The alleles_file should look something like this:
+
+```sh
+A*30:02:01:01
+A*24:02:01:01
+B*57:02:01:01
+B*48:01:01:01
+C*18:02:01:01
+C*08:06
+DRB1*03:02:01:01
+DRB1*04:01:01:01
+DRB3*01:62:01:01
+DQB1*04:02:01:01
+```
+
+To run scrHLAtag simply type:
+
+`scHLAtag -b BAMFILE -a ALLELES_FILE`
+
 
 
 ##### Help menu
 
+```sh
 count reads bam files per cb and umi for scrHLA typing
 
 USAGE:
@@ -44,7 +64,9 @@ OPTIONS:
     -a, --hlaalleles <alleles>    table of hla genes to search for (tsv)
     -b, --bam <bam>               input bam
     -c <cb>                       character to parse cell barcode; default = 'CB='
-    -g, --genome <genome>         reference genome
+    
+ ```
+
     -o, --out <outfile>           folder for output; default out
     -t, --threads <threads>       threads
     -u <umi>                      character to parse umi; default = 'XM='
