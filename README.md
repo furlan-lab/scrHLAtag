@@ -9,11 +9,17 @@ Pipeline for processing scrHLA typing data
 
 ### Overview
 
-scrHLAtag is command line software meant to process long-read (PacBio) sequencing data generated from 10X Genomics 5 prime libraries.  Using scrHLAtag, you can supply relevant HLA alleles, and obtain a counts file of the number of reads that map to your HLA query and their associated cell-barcodes and umis.  scrHLAtag takes as input a BAM file that has been processed using the single cell IsoSeq3 pipeline through the dedup stage.
+scrHLAtag is a command line tool written in Rust for processing long-read (PacBio) sequencing data generated from 10X Genomics libraries.  Using scrHLAtag, you can supply relevant HLA alleles, and obtain a counts file of the number of reads that map to your HLA query and their associated cell-barcodes and umis.  scrHLAtag takes as input a BAM file that has been processed using the single cell IsoSeq3 pipeline through the dedup stage.
 
 ### Installation
 
-scrHLAtag is written in Rust and requires two additional tools are available on the command line, minimap2 (ref) and samtools (ref). Once these dependencies are met, scrHLAtag repository is cloned 
+scrHLAtag is written in Rust.  To install the rust compiler go to https://www.rust-lang.org/tools/install.  scrHLAtag requires two additional tools be available on the command line, minimap2 (ref) and samtools (ref). 
+
+To install scrHLAtag:
+1. clone the repository by typing `https://github.com/furlan-lab/scrHLAtag.git` from the location you want to build from
+2. build by entring `cargo build release`
+3. the build process will create a self contained binary executable file in targets/release directory called `scrHLAtag`
+4. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
 ### Usage
 
