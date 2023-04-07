@@ -46,7 +46,7 @@ DQB1*04:02:01:01
 
 To run scrHLAtag simply type:
 
-`scHLAtag -b BAMFILE -a ALLELES_FILE`
+`scHLAtag -b BAMFILE -a ALLELES_FILE -o OUTFOLDER`
 
 
 
