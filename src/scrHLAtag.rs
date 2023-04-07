@@ -538,8 +538,8 @@ pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
                         },
                 };
                 // eprintln!("hi: {} {} {} {} {} {} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.cigar(), nm_tag, as_tag, s1_tag, de_tag);
-                // columns cb, umi, seqname, cigar, NM, AS, chaining_score, de (per base sequence divergence)
-                molecule_data.push(format!("{} {} {} {} {} {} {} {}\n", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
+                // columns cb, umi, seqname, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence)
+                molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {}\n", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
                 
         }
     }
@@ -581,9 +581,9 @@ pub fn write_counts (count_vec: Vec<Vec<u8>>, params: &Params) -> Result<(), Box
 pub fn write_molecules (molecule_vec: Vec<String>, params: &Params) -> Result<(), Box<dyn Error>> {
         let molecule_path = params.output.join("molecule_txt.gz");
         let molecule_file = molecule_path.to_str().unwrap();
-        info!("\t\tWriting counts to : '{}'", molecule_file);
+        info!("\t\tWriting molecule info to : '{}'", molecule_file);
         if params.verbose{
-            eprintln!("Writing counts to : '{}'\n", molecule_file);
+            eprintln!("Writing molecule info to : '{}'\n", molecule_file);
         }
         let f = File::create(molecule_file)?;
         let mut gz = GzBuilder::new()
