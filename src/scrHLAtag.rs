@@ -47,6 +47,8 @@ pub struct Params {
     pub output: Box<Path>,
     pub verbose: bool,
     pub hla_ref: String,
+    pub cb_tag: String,
+    pub umi_tag: String,
 }
 
 
@@ -58,6 +60,8 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
     // eprintln!("{:?}", params);
     let bam = params.value_of("bam").unwrap().to_string();
     let alleles_file = params.value_of("alleles").unwrap().to_string();
+    let cb = params.value_of("c").unwrap_or("CB").to_string();
+    let umi = params.value_of("u").unwrap_or("XM").to_string();
     let output = params.value_of("output").unwrap_or("out").to_string();
     let threads = params.value_of("threads").unwrap_or("1").to_string().parse::<usize>().unwrap();
     let mut verbose = false;
@@ -125,6 +129,8 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
             output: outpath.into(),
             verbose: verbose,
             hla_ref: hla_ref.to_string(),
+            cb_tag: cb,
+            umi_tag: umi,
     })
 }
 
@@ -236,7 +242,7 @@ pub fn test_progs (software: String) -> Result<(), Box<dyn Error>>{
 
 fn calc_threads(params: &Params) -> u16 {
     if params.threads>2{
-        (params.threads/2).try_into().unwrap()
+        (params.threads-1).try_into().unwrap()
     } else {
         0
     }
@@ -465,7 +471,7 @@ pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
     let mut mapped_count: usize = 0;
 
     // bam reader and get seqnames
-    let bam_reader = bam::BamReader::from_path(bam_file, 0).unwrap();
+    let bam_reader = bam::BamReader::from_path(bam_file, calc_threads(params)).unwrap();
     let mut seqnames = Vec::new();
     let mut _result = "";
     let header = bam_reader.header().clone();

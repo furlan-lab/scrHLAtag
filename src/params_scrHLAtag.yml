@@ -29,12 +29,12 @@ args:
         help: threads
     - cb:
         short: c
-        help: character to parse cell barcode; default = 'CB='
+        help: character to parse cell barcode; default = 'CB'
         takes_value: true
         required: false
     - umi:
         short: u
-        help: character to parse umi; default = 'XM='
+        help: character to parse umi; default = 'XM'
         takes_value: true
         required: false
     - verbose:
