@@ -64,7 +64,7 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
     let alleles_file = params.value_of("alleles_file").unwrap().to_string();
     let cb = params.value_of("c").unwrap_or("CB").to_string();
     let umi = params.value_of("u").unwrap_or("XM").to_string();
-    let output = params.value_of("output").unwrap_or("out").to_string();
+    let output = params.value_of("output_folder").unwrap_or("out").to_string();
     let threads = params.value_of("threads").unwrap_or("1").to_string().parse::<usize>().unwrap();
     let mut verbose = false;
     if params.is_present("verbose") {
