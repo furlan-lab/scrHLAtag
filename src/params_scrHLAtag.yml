@@ -1,5 +1,5 @@
 name: scrHLAtag
-version: "0.1"
+version: "0.1.0"
 author: 'copyright Scott Furlan'
 about: 'scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell libraries'
 args:

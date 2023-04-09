@@ -20,38 +20,49 @@ To install scrHLAtag:
 4. the build process will create a self contained binary executable file in `targets/release` directory called `scrHLAtag`
 5. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
+### Updates
+
+**version 0.1.0** 4/9/23 - first stable version.  Implements both transcriptomic and genomic options
+
 ### Usage
 
-##### Invocation.
+##### Alleles File.
 
 First users will generate a simple 'alleles_file' that lists the HLA alleles to be counted (txt.file). The names of the alleles should be taken from the Anthony Nolan registry (https://www.ebi.ac.uk/ipd/imgt/hla/).  The alleles_file should look something like this:
 
 ```sh
-A*30:02:01:01
-A*24:02:01:01
-B*57:02:01:01
-B*48:01:01:01
-C*18:02:01:01
+A*30:02:01
+A*24:02:01
+B*57:02:01
+B*48:01:01
+C*18:02:01
 C*08:06
-DRB1*03:02:01:01
+DRB1*03:02:01
 DRB1*04:01:01:01
 DRB3*01:62:01:01
 DQB1*04:02:01:01
 ```
-Note: the hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  Current version: 3.50.  Additionally, because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however.
+Important Notes: 
+1. The hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  Current version: 3.51. 
+2. Because scrHLAtag is designed for use with single cell RNA data, only up to 3 field HLA nomenclature should be used.  See https://hla.alleles.org/nomenclature/naming.html for more details about HLA nomenclature.
+3. Because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however.
 
-To run scrHLAtag simply type:
 
-`scHLAtag -b BAMFILE -a ALLELES_FILE -o OUTFOLDER`
+##### Invocation
+
+**To run scrHLAtag simply type:**
+
+**`scHLAtag -b BAMFILE -a ALLELES_FILE -o OUTFOLDER`**
 
 
 
 ##### Help menu
 
 ```sh
-scrHLAtag 0.0.2
+scrHLAtag 0.1.0
 copyright Scott Furlan
-scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell libraries
+scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell
+libraries
 
 USAGE:
     scrHLAtag [FLAGS] [OPTIONS] --alleles <alleles_file> --bam <bam>
@@ -62,23 +73,29 @@ FLAGS:
     -v, --verbose    verbose
 
 OPTIONS:
+    -l, --level <align_level>       align to 'genome', 'transcriptome', or 'both'; default is 'both'
     -a, --alleles <alleles_file>    table of hla genes to search for (tsv file)
     -b, --bam <bam>                 input bam
-    -c, --cellbarcode <cb>          character to parse cell barcode; default = 'CB'
-    -o, --out <outfile>             folder for output; default 'out'
+    -c, --cb_tag <cb>               character to parse cell barcode; default = 'CB'
+    -o, --out <output_folder>       folder for output; default 'out'
     -t, --threads <threads>         threads
-    -u, --umi <umi>                 character to parse umi; default = 'XM'
+    -u, --umi_tag <umi>             character to parse umi; default = 'XM'
 ```
  
 ### Output
  
-scrHLAtag will output the following files:
+scrHLAtag will output the following files (depending on alignment level):
 ```sh
-Aligned_mm2_sorted.bam          = minimap2 output bam file, sorted by readname
-Aligned_mm2_sorted.bam.bai      = index for above bam
-counts.txt.gz                   = counts file; columns: CB, UMI, allele, read_count
-align.fa                        = fasta reference file used for minimap2 alignment
-molecules_info.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de)
+Aligned_mm2_sorted_gene.bam          = minimap2 output bam file aligned to genome, sorted by read name 
+Aligned_mm2_sorted_mRNA.bam          = minimap2 output bam file aligned to transcriptome, sorted by read name 
+Aligned_mm2_sorted_gene.bam.bai      = index for above bam
+Aligned_mm2_sorted_mRNA.bam.bai      = index for above bam
+counts_gene.txt.gz                   = counts file; columns: CB, UMI, allele, read_count
+counts._mRNAtxt.gz                   = counts file; columns: CB, UMI, allele, read_count
+align_gene.fa                        = fasta reference file used for minimap2 alignment
+align_mRNA.fa                        = fasta reference file used for minimap2 alignment
+molecules_info_gene.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de)
+molecules_info_mRNA.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de)
 ```
 See minimap2 manual (https://lh3.github.io/minimap2/minimap2.html) for a discussion of the molecule_info metrics
 
