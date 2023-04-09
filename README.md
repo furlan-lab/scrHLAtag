@@ -22,7 +22,7 @@ To install scrHLAtag:
 
 ### Updates
 
-**version 0.1.0** 4/9/23 - first stable version.  Implements both transcriptomic and genomic options
+**version 0.1.0** - 4/9/23 - first stable version.  Implements both transcriptomic and genomic options
 
 ### Usage
 
@@ -38,13 +38,13 @@ B*48:01:01
 C*18:02:01
 C*08:06
 DRB1*03:02:01
-DRB1*04:01:01:01
-DRB3*01:62:01:01
-DQB1*04:02:01:01
+DRB1*04:01:01
+DRB3*01:62:01
+DQB1*04:02:01
 ```
-Important Notes: 
-1. The hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  Current version: 3.51. 
-2. Because scrHLAtag is designed for use with single cell RNA data, only up to 3 field HLA nomenclature should be used.  See https://hla.alleles.org/nomenclature/naming.html for more details about HLA nomenclature.
+**Important Notes:**
+1. Because scrHLAtag is designed for use with single cell RNA data, ***only up to 3 field HLA nomenclature should be used***.  See https://hla.alleles.org/nomenclature/naming.html for more details about HLA nomenclature.
+2. The hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  *Current version: 3.51.*
 3. Because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however.
 
 
