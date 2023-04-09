@@ -1,7 +1,7 @@
 ## download IMGT-HLA database
 ```bash
 cd ~/develop
-git clone https://github.com/ANHIG/IMGTHLA.git #version 3.52 4/8/23
+git clone https://github.com/ANHIG/IMGTHLA.git #version 3.51.0 4/8/23
 cd IMGTHLA
 cat Allelelist.txt
 ```
