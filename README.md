@@ -43,7 +43,7 @@ DRB3*01:62:01
 DQB1*04:02:01
 ```
 **Important Notes:**
-1. Because scrHLAtag is designed for use with single cell RNA data, ***only up to 3 field HLA nomenclature should be used***.  See https://hla.alleles.org/nomenclature/naming.html for more details about HLA nomenclature.
+1. Because scrHLAtag is designed for use with single cell RNA data, ***only up to 3 field HLA nomenclature should be used***.  HLA alleles which only vary in the 4th field from each other (i.e. A\*30:02:01:01, A\*30:02:01:02, A\*30:02:01:03, etc) have been removed from the reference and only the 01 allele of the 4th field was retained in the reference.  Code showing how this was accomplished, can be found in `scripts/generation_refs.sh`.  See https://hla.alleles.org/nomenclature/naming.html for more details about HLA nomenclature.
 2. The hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  *Current version: 3.51.0 - 2023-01*
 3. Because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however.
 
@@ -52,7 +52,7 @@ DQB1*04:02:01
 
 **To run scrHLAtag simply type:**
 
-**`scHLAtag -b BAMFILE -a ALLELES_FILE -o OUTFOLDER`**
+`scHLAtag -b BAMFILE -a ALLELES_FILE -o OUTFOLDER`
 
 
 
