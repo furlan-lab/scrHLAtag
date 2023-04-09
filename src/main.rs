@@ -11,11 +11,13 @@ use crate::scrhlatag::*;
 fn main() {
 
     let params = load_params().unwrap();
-    if params.verbose {
-        eprintln!("Writing log file: {}", &params.output.join("scrHLAtag.log").to_string_lossy());
+    let checked_params = load_params().unwrap();
+    if checked_params.verbose {
+        eprintln!("Writing log file: '{}'", &checked_params.output_path.join("scrHLAtag.log").to_str().unwrap());
     }
+
     let config = LogConfigBuilder::builder()
-        .path(params.output.join("scrHLAtag.log").to_string_lossy())
+        .path(checked_params.output_path.join("scrHLAtag.log").to_str().unwrap())
         .size(1 * 100)
         .roll_count(10)
         .time_format("%Y-%m-%d %H:%M:%S.%f") //E.g:%H:%M:%S.%f
@@ -24,58 +26,57 @@ fn main() {
         .build();
     let _ = simple_log::new(config);
 
-    info!("\t\t\t\tParsing Parameters!");
-    info!("\t\t\t\tRunning with {} thread(s)!", &params.threads);
-    if params.verbose {
-        eprintln!("Parsing Parameters!");
-        eprintln!("Running with {} thread(s)!", &params.threads);
+    let runs = create_runs(&checked_params);
+    let alleles_query = read_allelesfile(&checked_params);
+    info!("\t\t\t\tRunning with {} thread(s)!", &checked_params.threads);
+    if checked_params.verbose {
+        eprintln!("Running with {} thread(s)!", &checked_params.threads);
     }
 
-    if params.verbose {
+    if checked_params.verbose {
         eprintln!("Checking command line programs!");
     }
     info!("\t\t\t\tChecking command line programs!");
     let _prog_test_res = test_progs("minimap2".to_string());
     let _prog_test_res = test_progs("samtools".to_string());
 
-    
-    if params.verbose {
-        eprintln!("Matching HLA alleles with known references!");
+
+    if checked_params.verbose {
+        eprintln!("\nMaking fastq from BAM: '{}'", &checked_params.bam);
     }
-    info!("\t\t\t\tMatching HLA alleles with known references!");
-    let alleles_query = read_allelesfile(&params);
-    let align_fasta_path = &params.output.join("align.fa");
-    let align_fasta = align_fasta_path.to_str().unwrap();
+    info!("\t\t\t\tMaking fastq from BAM: '{}'", &checked_params.bam);
+    let _fq = make_fastq(&checked_params);
 
-    if params.verbose {
-        eprintln!("Making partial reference: '{}'", &align_fasta);
+            
+    for run in runs {
+            if run.params.verbose {
+                eprintln!("Matching HLA alleles with known {} reference!", &run.level.descriptor);
+            }
+            info!("\t\t\t\tMatching HLA alleles with known references!");
+
+            if run.params.verbose {
+                eprintln!("Making partial reference: '{}'", &run.level.mini_fasta.to_str().unwrap());
+            }
+            info!("\t\t\t\tMaking partial reference: '{}'", &run.level.mini_fasta.to_str().unwrap());
+
+            let _fasta_names = make_partial_reference(&alleles_query, &run);
+            // align sort and count have their own loggers
+            let _al = align(&run);
+            let _so = sort(&run);
+            let (counts, molecule_info) = count(&run);
+
+            let _wc = write_counts(counts, &run);
+            let _wm = write_molecules(molecule_info, &run);
+
+            if run.params.verbose {
+                eprintln!("Cleaning up!\n");
+            }  
+            info!("\t\t\t\tCleaning up!");
+            let _cu = cleanup(&run.level.out_unsorted_sam, true);
+            let _cu = cleanup(&run.level.out_sorted_sam, true);
+
     }
-    info!("\t\t\t\tMaking partial reference: '{}'", &align_fasta);
-
-    let _fasta_names = make_partial_reference(alleles_query, &params);
-
-
-    if params.verbose {
-        eprintln!("\nMaking fastq from BAM: '{}'", &params.bam);
-    }
-    info!("\t\t\t\tMaking fastq from BAM: '{}'", &params.bam);
-    let _fq = make_fastq(&params);
-
-    // align sort and count have their own loggers
-    let _al = align(&params);
-    let _so = sort(&params);
-    let (counts, molecule_info) = count(&params);
-
-    if params.verbose {
-        eprintln!("Cleaning up!\n");
-    }  
-    info!("\t\t\t\tCleaning up!");
-    let _cu = cleanup(&params.output.join("Aligned_mm2.sam"), true);
-    let _cu = cleanup(&params.output.join("Aligned_mm2_sorted.sam"), true);
-    let _cu = cleanup(&params.output.join("fastq.fq.gz"), true);
-    let _wc = write_counts(counts, &params);
-    let _wm = write_molecules(molecule_info, &params);
-
+    let _cu = cleanup(&checked_params.output_path.join("fastq.fq.gz"), true);
     if params.verbose {
         eprintln!("Done!!!");
     }

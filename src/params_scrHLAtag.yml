@@ -1,5 +1,5 @@
 name: scrHLAtag
-version: "0.0.2"
+version: "0.1"
 author: 'copyright Scott Furlan'
 about: 'scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell libraries'
 args:
@@ -21,6 +21,12 @@ args:
         takes_value: true
         required: false
         help: folder for output; default 'out'
+    - align_level:
+        long: level
+        short: l
+        takes_value: true
+        required: false
+        help: align to 'genome', 'transcriptome', or 'both'; default is 'both'
     - threads:
         long: threads
         short: t

@@ -1,6 +1,6 @@
 /**
 
-~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
+~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out -l transcriptome
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_dedup.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
 
 
@@ -41,27 +41,97 @@ pub struct HLAalleles {
     allele: String
 }
 
-
-pub struct Params {
+#[derive(Clone)]
+pub struct InputParams {
     pub bam: String,
     pub threads: usize,
     pub alleles_file: String,
-    pub output: Box<Path>,
+    pub output_path: Box<Path>,
     pub verbose: bool,
-    pub hla_ref: String,
     pub cb_tag: String,
     pub umi_tag: String,
+    pub level: String,
+}
+
+pub struct AlignmentLevel {
+    pub file_tag: String,
+    pub hla_ref: PathBuf,
+    pub descriptor: String,
+    pub mini_fasta: PathBuf,
+    pub out_unsorted_sam: PathBuf,
+    pub out_sorted_sam: PathBuf,
+    pub out_sorted_bam: PathBuf,
+    pub counts: PathBuf,
+    pub molecule: PathBuf,
+}
+
+pub struct Run {
+    pub level: AlignmentLevel,
+    pub params: InputParams,
+}
+
+pub fn create_runs(params: &InputParams) -> Vec<Run> {
+    let package_dir_path = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut runs = Vec::new();
+    if params.level == "transcriptome" {
+        runs.push(Run{
+            level: AlignmentLevel{
+                file_tag: "mRNA".to_string(),
+                hla_ref: package_dir_path.join("data/HLA_DB_3field_mRNA.fa.gz"),
+                descriptor: "transcriptome".to_string(),
+                mini_fasta: params.output_path.join("align_mRNA.fa"),
+                out_unsorted_sam: params.output_path.join("Aligned_mm2_mRNA.sam"),
+                out_sorted_sam: params.output_path.join("Aligned_mm2_sorted_mRNA.sam"),
+                out_sorted_bam: params.output_path.join("Aligned_mm2_sorted_mRNA.bam"),
+                counts: params.output_path.join("counts_mRNA.txt.gz"),
+                molecule: params.output_path.join("molecule_info_mRNA.txt.gz"),
+            },
+            params: params.clone(),
+        });
+        return runs;
+    } else {
+        runs.push(Run{
+            level: AlignmentLevel{
+                file_tag: "mRNA".to_string(),
+                hla_ref: package_dir_path.join("data/HLA_DB_3field_gene.fa.gz"),
+                descriptor: "genome".to_string(),
+                mini_fasta: params.output_path.join("align_gene.fa"),
+                out_unsorted_sam: params.output_path.join("Aligned_mm2_gene.sam"),
+                out_sorted_sam: params.output_path.join("Aligned_mm2_sorted_gene.sam"),
+                out_sorted_bam: params.output_path.join("Aligned_mm2_sorted_gene.bam"),
+                counts: params.output_path.join("counts_gene.txt.gz"),
+                molecule: params.output_path.join("molecule_info_gene.txt.gz"),
+            },
+            params: params.clone(),
+        });
+        if params.level == "both" {
+            runs.push(Run{
+                level: AlignmentLevel{
+                    file_tag: "mRNA".to_string(),
+                    hla_ref: package_dir_path.join("data/HLA_DB_3field_mRNA.fa.gz"),
+                    descriptor: "transcriptome".to_string(),
+                    mini_fasta: params.output_path.join("align_mRNA.fa"),
+                    out_unsorted_sam: params.output_path.join("Aligned_mm2_mRNA.sam"),
+                    out_sorted_sam: params.output_path.join("Aligned_mm2_sorted_mRNA.sam"),
+                    out_sorted_bam: params.output_path.join("Aligned_mm2_sorted_mRNA.bam"),
+                    counts: params.output_path.join("counts_mRNA.txt.gz"),
+                    molecule: params.output_path.join("molecule_info_mRNA.txt.gz"),
+                },
+                params: params.clone(),
+            });
+        }
+        return runs
+    }
 }
 
 
-pub fn load_params() -> Result<Params, Box<dyn Error>> {
-    let wdpb= get_current_working_dir().unwrap();
-    let wdir = wdpb.to_str().unwrap();
+pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
     let yaml = load_yaml!("params_scrHLAtag.yml");
     let params = App::from_yaml(yaml).get_matches();
     // eprintln!("{:?}", params);
     let bam = params.value_of("bam").unwrap().to_string();
     let alleles_file = params.value_of("alleles_file").unwrap().to_string();
+    let level = params.value_of("align_level").unwrap_or("both").to_string();
     let cb = params.value_of("cb").unwrap_or("CB").to_string();
     let umi = params.value_of("umi").unwrap_or("XM").to_string();
     let output = params.value_of("output_folder").unwrap_or("out").to_string();
@@ -70,12 +140,25 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
     if params.is_present("verbose") {
         verbose = true;
     }
-    let package_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let hla_path = package_dir.join("data/hla_mRNA.fasta.gz");
-    let hla_ref = hla_path.to_str().unwrap();
-    let _cu = cleanup(&Path::new(&output).join("scrHLAtag.log"), false);
+    let outpath = Path::new(&output);
+    Ok(InputParams{
+            bam: bam,
+            threads: threads as usize,
+            alleles_file: alleles_file,
+            output_path: outpath.into(),
+            verbose: verbose,
+            // hla_ref: hla_ref.to_string(),
+            cb_tag: cb,
+            umi_tag: umi,
+            level: level.to_string(),
+    })
+}
+
+
+pub fn check_params(params: InputParams) -> Result<InputParams, Box<dyn Error>>{
+    let _cu = cleanup(&params.output_path.join("scrHLAtag.log"), false);
     let config = LogConfigBuilder::builder()
-        .path(Path::new(&output).join("scrHLAtag.log").to_string_lossy())
+        .path(params.output_path.join("scrHLAtag.log").to_str().unwrap())
         .size(1 * 100)
         .roll_count(10)
         .time_format("%Y-%m-%d %H:%M:%S.%f") //E.g:%H:%M:%S.%f
@@ -83,60 +166,67 @@ pub fn load_params() -> Result<Params, Box<dyn Error>> {
         .output_file()
         .build();
     let _ = simple_log::new(config);
+    let allowables = vec!["genome".to_string(), "transcrptome".into(), "both".into()];
+    if !allowables.contains(&params.level){
+        error!("\t\tInput 'level' parameter is not valid.  User supplied {}", params.level);
+        panic!("Input 'level' parameter is not valid.  User supplied {}", params.level);
+    }
     info!("\t\t\tStarting!");
+    let wdpb= get_current_working_dir().unwrap();
+    let wdir = wdpb.to_str().unwrap();
     info!("\t\t\tCurrent working directory: '{}'", wdir);
-    if verbose {
+    if params.verbose {
         eprintln!("\n\nCurrent working directory: '{}'", wdir);
     }
-    let outpath = Path::new(&output);
-    if outpath.is_relative(){
-        let a1 = Path::new(wdir).join(&output);
+    if params.output_path.is_relative(){
+        let a1 = Path::new(wdir).join(&params.output_path);
         let abs_outpath = a1.to_str().unwrap();
-        if outpath.exists() {
+        if params.output_path.exists() {
                 info!("\t\t\tFound existing output directory: '{}'", &abs_outpath);
                 warn!("\t\t\t{}", "Existing data in this folder could be lost!!!");
-               if verbose {
+               if params.verbose {
                     eprintln!("Found existing output directory: '{}'", &abs_outpath);
                     eprintln!("\t{}", "Existing data in this folder could be lost!!!");
                 }
         } else {
             info!("\t\tCreating output directory: '{}'", &abs_outpath);
-            if verbose {
+            if params.verbose {
                 eprintln!("Creating output directory: '{}'", &abs_outpath);
             }
-            fs::create_dir(outpath)?;
+            fs::create_dir(&params.output_path)?;
         }
     } else {
-        let abs_outpath = outpath.to_str().unwrap();
-        if outpath.exists() {
+        let abs_outpath = &params.output_path.to_str().unwrap();
+        if params.output_path.exists() {
             info!("\t\tFound existing output directory: '{}'", &abs_outpath);
             warn!("\t\t{}", "Existing data in this folder could be lost!!!");
-            if verbose {
+            if params.verbose {
                 eprintln!("Found existing output directory: '{}'", &abs_outpath);
                 eprintln!("\t{}", "Existing data in this folder could be lost!!!");
             }
         } else {
             info!("\t\tCreating output directory: '{}'", &abs_outpath);
-            if verbose {
+            if params.verbose {
                 eprintln!("Creating output directory: '{}'", &abs_outpath);
             }
-            fs::create_dir(outpath)?;
+            fs::create_dir(&params.output_path)?;
         }
     }
-    Ok(Params{
-            bam: bam,
-            threads: threads as usize,
-            alleles_file: alleles_file,
-            output: outpath.into(),
-            verbose: verbose,
-            hla_ref: hla_ref.to_string(),
-            cb_tag: cb,
-            umi_tag: umi,
+    Ok(InputParams{
+            bam: params.bam,
+            threads: params.threads,
+            alleles_file: params.alleles_file,
+            output_path: params.output_path,
+            verbose: params.verbose,
+            // hla_ref: hla_ref.to_string(),
+            cb_tag: params.cb_tag,
+            umi_tag: params.umi_tag,
+            level: params.level,
     })
 }
 
 
-pub fn read_allelesfile(params: &Params) -> Vec<HLAalleles> {
+pub fn read_allelesfile(params: &InputParams) -> Vec<HLAalleles> {
     info!("\t\tOpening alleles file: '{}'", &params.alleles_file.to_string());
     if params.verbose {
         eprintln!("Opening alleles file: '{}'", &params.alleles_file.to_string());
@@ -170,15 +260,15 @@ pub fn read_allelesfile(params: &Params) -> Vec<HLAalleles> {
  * It then writes a new fasta containing only the desired alleles in alleles_query.  It returns the names
  * of the entries for later writing into a bam header.
 **/
-pub fn make_partial_reference (alleles_query: Vec<HLAalleles>, params: &Params) -> Result<Vec<String>, Box<dyn Error>>{
+pub fn make_partial_reference (alleles_query: &Vec<HLAalleles>, run: &Run) -> Result<Vec<String>, Box<dyn Error>>{
     let mut names: HashMap<String, usize> = HashMap::new();
     let mut i: usize = 0;
-    info!("\t\tRead HLA reference file: '{}'", &params.hla_ref);
-    if params.verbose {
-        eprintln!("Read HLA reference file: '{}'", &params.hla_ref);
+    info!("\t\tRead HLA reference file: '{}'", &run.level.hla_ref.to_str().unwrap());
+    if run.params.verbose {
+        eprintln!("Read HLA reference file: '{}'", &run.level.hla_ref.to_str().unwrap());
     }
 
-    let mut records = parse_path(&params.hla_ref).unwrap();
+    let mut records = parse_path(&run.level.hla_ref).unwrap();
     while let Some(record) = records.iter_record().unwrap() {
         i = i+1;
         names.insert(parse_fasta_header(record.head().to_string()), i);
@@ -189,26 +279,26 @@ pub fn make_partial_reference (alleles_query: Vec<HLAalleles>, params: &Params) 
         let matched = names.get(&data.allele);
         if matched.is_some(){
             info!("\t\t\tFound: {}", &data.allele);
-            if params.verbose {
+            if run.params.verbose {
                 eprintln!("\tFound: {}", &data.allele);
             }
             simpleindices.push(*matched.unwrap())
         } else{ 
             warn!("\t\tCould not find: {}", &data.allele);
-            if params.verbose {
+            if run.params.verbose {
                 eprintln!("Could not find: {}", &data.allele)
             }
         };
     }
     i = 0;
-    let align_fasta_path = params.output.join("align.fa");
+    let align_fasta_path = &run.level.mini_fasta;
     let align_fasta = align_fasta_path.to_str().unwrap();
     let f = File::create(align_fasta)?;
 
     // write align.fasta
     let mut fasta_writer = fasta::writer::Builder::default().build_with_writer(BufWriter::new(f));
     let mut names_out = Vec::new();
-    let mut records = parse_path(&params.hla_ref).unwrap();
+    let mut records = parse_path(&run.level.hla_ref).unwrap();
     while let Some(record) = records.iter_record().unwrap() {
         i = i+1;
         if simpleindices.contains(&i){
@@ -241,7 +331,7 @@ pub fn test_progs (software: String) -> Result<(), Box<dyn Error>>{
     Ok(())
 }
 
-fn calc_threads(params: &Params) -> u16 {
+fn calc_threads(params: &InputParams) -> u16 {
     if params.threads>2{
         (params.threads-1).try_into().unwrap()
     } else {
@@ -251,11 +341,11 @@ fn calc_threads(params: &Params) -> u16 {
 }
 
 #[allow(unused_assignments)]
-pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
+pub fn make_fastq (params: &InputParams)-> Result<(), Box<dyn Error>> {
 
     // declare local variables
     let split = "|BARCODE=".to_string();
-    let fastq_path = &params.output.join("fastq.fq.gz");
+    let fastq_path = &params.output_path.join("fastq.fq.gz");
     let bam_fn = Path::new(&params.bam);
     // let cb_b: [u8; 2] = clone_into_array(&params.cb_tag.as_bytes().to_vec()[0..1]);
     let binding = params.cb_tag.as_bytes().to_vec();
@@ -336,23 +426,24 @@ pub fn make_fastq (params: &Params)-> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn align (params: &Params)-> Result<(), Box<dyn Error>> {
-    let align_fasta_path = params.output.join("align.fa");
+
+pub fn align (run: &Run)-> Result<(), Box<dyn Error>> {
+    let align_fasta_path = &run.level.mini_fasta;
     let align_fasta = align_fasta_path.to_str().unwrap();
     if !align_fasta_path.exists() {
         error!("\t\tAlignment fasta not found at: {}", align_fasta);
         panic!("Alignment fasta not found at: {}", align_fasta);
     }
-    let fastq_path = params.output.join("fastq.fq.gz");
+    let fastq_path = run.params.output_path.join("fastq.fq.gz");
     let fastq_file = fastq_path.to_str().unwrap();
     if !fastq_path.exists() {
         error!("\t\tAlignment fastq not found at: {}", fastq_file);
         panic!("Alignment fastq not found at: {}", fastq_file);
     }
-    let sam_path = params.output.join("Aligned_mm2.sam");
+    let sam_path = &run.level.out_unsorted_sam;
     let sam_file = sam_path.to_str().unwrap();
     info!("\t\t{}", "Aligning reads using minimap2 - Output below:");
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", "Aligning reads using minimap2 - Output below:\n");
     }
     let output = Command::new("minimap2")
@@ -364,7 +455,7 @@ pub fn align (params: &Params)-> Result<(), Box<dyn Error>> {
                     .arg("--MD")
                     .arg("-a")
                     .arg("-t")
-                    .arg(params.threads.to_string())
+                    .arg(run.params.threads.to_string())
                     .arg(align_fasta)
                     .arg(fastq_file)
                     .arg("-o")
@@ -374,32 +465,33 @@ pub fn align (params: &Params)-> Result<(), Box<dyn Error>> {
                      .output()
                      .expect("\n\n*******Failed to execute minimap2*******\n\n");
     info!("{}", String::from_utf8_lossy(&output.stderr));
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
     Ok(())
 }
 
 
-pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
-    let sam_path = params.output.join("Aligned_mm2.sam");
+
+pub fn sort (run: &Run)-> Result<(), Box<dyn Error>> {
+    let sam_path = &run.level.out_unsorted_sam;
     let sam_file = sam_path.to_str().unwrap();
     if !sam_path.exists() {
         error!("\t\tSAM not found at: {}", sam_file);
         panic!("SAM not found at: {}", sam_file);
     }
-    let ssam_path = params.output.join("Aligned_mm2_sorted.sam");
+    let ssam_path = &run.level.out_sorted_sam;
     let ssam_file = ssam_path.to_str().unwrap();
-    let bam_path = params.output.join("Aligned_mm2_sorted.bam");
+    let bam_path = &run.level.out_sorted_bam;
     let bam_file = bam_path.to_str().unwrap();
     info!("\t\t{}", "Minimap2 complete; Running samtools sort");
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", "Minimap2 complete; Running samtools sort");
     }
     let output = Command::new("samtools")
                     .arg("sort")
                     .arg("-@")
-                    .arg(params.threads.to_string())
+                    .arg(run.params.threads.to_string())
                     .arg("-o")
                     .arg(ssam_file)
                     .arg(sam_file)
@@ -408,12 +500,12 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
                     .output()
                      .expect("\n\n*******Failed to execute samtools view*******\n\n");
     info!("\t\t{}", String::from_utf8_lossy(&output.stderr));
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
         
     }
     info!("\t\t{}", "Samtools sort complete; Running samtools view");
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", "Samtools sort complete; Running samtools view");
     }
     
@@ -425,7 +517,7 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
                     .arg("view")
                     .arg("-b")
                     .arg("-@")
-                    .arg(params.threads.to_string())
+                    .arg(run.params.threads.to_string())
                     .arg("-o")
                     .arg(bam_file)
                     .arg(ssam_file)
@@ -434,11 +526,11 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
                     .output()
                      .expect("\n\n*******Failed to execute samtools sort*******\n\n");
     info!("\t\t{}", String::from_utf8_lossy(&output.stderr));
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
     info!("\t\t{}", "Samtools view complete; Running samtools index");
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", "Samtools view complete; Running samtools index");
     }
     if !bam_path.exists() {
@@ -448,26 +540,26 @@ pub fn sort (params: &Params)-> Result<(), Box<dyn Error>> {
     let output = Command::new("samtools")
                     .arg("index")
                     .arg("-@")
-                    .arg(params.threads.to_string())
+                    .arg(run.params.threads.to_string())
                     .arg(bam_file)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .output()
                      .expect("\n\n*******Failed to execute samtools index*******\n\n");
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
     Ok(())
 }
 
-pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
+pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
     info!("\t\tCounting reads:");
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("Counting reads:");
     }
     // declare some stuff
     let split = "|BARCODE=".to_string();
-    let bam_path = params.output.join("Aligned_mm2_sorted.bam");
+    let bam_path = &run.level.out_sorted_bam;
     let bam_file = bam_path.to_str().unwrap();
     let mut total_count: usize = 0;
     let mut err_count: usize = 0;
@@ -475,7 +567,7 @@ pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
     let mut mapped_count: usize = 0;
 
     // bam reader and get seqnames
-    let bam_reader = bam::BamReader::from_path(bam_file, calc_threads(params)).unwrap();
+    let bam_reader = bam::BamReader::from_path(bam_file, calc_threads(&run.params)).unwrap();
     let mut seqnames = Vec::new();
     let mut _result = "";
     let header = bam_reader.header().clone();
@@ -548,7 +640,7 @@ pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
     }
     info!("\t\t\tTotal reads processed: {}\tReads with errors: {}", total_count, err_count);
     info!("\t\t\tUnmapped reads: {}\tMapped reads: {}", unmapped_count, mapped_count);
-    if params.verbose {
+    if run.params.verbose {
         eprintln!("\tTotal reads processed: {}\n\tReads with errors: {}\n\tUnmapped reads: {}\n\tMapped reads: {}\n", total_count, err_count, unmapped_count, mapped_count);
     }
     data.sort();
@@ -563,11 +655,11 @@ pub fn count(params: &Params) -> (Vec<Vec<u8>>, Vec<String>){
     return (out_vec, molecule_data);
 }
 
-pub fn write_counts (count_vec: Vec<Vec<u8>>, params: &Params) -> Result<(), Box<dyn Error>> {
-        let counts_path = params.output.join("counts.txt.gz");
+pub fn write_counts (count_vec: Vec<Vec<u8>>, run: &Run) -> Result<(), Box<dyn Error>> {
+        let counts_path = &run.level.counts;
         let counts_file = counts_path.to_str().unwrap();
         info!("\t\tWriting counts to : '{}'", counts_file);
-        if params.verbose{
+        if run.params.verbose{
             eprintln!("Writing counts to : '{}'\n", counts_file);
         }
         let f = File::create(counts_file)?;
@@ -581,11 +673,11 @@ pub fn write_counts (count_vec: Vec<Vec<u8>>, params: &Params) -> Result<(), Box
         Ok(())
 }
 
-pub fn write_molecules (molecule_vec: Vec<String>, params: &Params) -> Result<(), Box<dyn Error>> {
-        let molecule_path = params.output.join("molecule_txt.gz");
+pub fn write_molecules (molecule_vec: Vec<String>, run: &Run) -> Result<(), Box<dyn Error>> {
+        let molecule_path = &run.level.molecule;
         let molecule_file = molecule_path.to_str().unwrap();
         info!("\t\tWriting molecule info to : '{}'", molecule_file);
-        if params.verbose{
+        if run.params.verbose{
             eprintln!("Writing molecule info to : '{}'\n", molecule_file);
         }
         let f = File::create(molecule_file)?;
