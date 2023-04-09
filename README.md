@@ -84,7 +84,7 @@ OPTIONS:
  
 ### Output
  
-scrHLAtag will output the following files (depending on alignment level):
+scrHLAtag will output some combination of the following files (depending on alignment level):
 ```sh
 Aligned_mm2_sorted_gene.bam          = minimap2 output bam file aligned to genome, sorted by read name 
 Aligned_mm2_sorted_mRNA.bam          = minimap2 output bam file aligned to transcriptome, sorted by read name 
