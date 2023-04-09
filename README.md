@@ -44,7 +44,7 @@ DQB1*04:02:01
 ```
 **Important Notes:**
 1. Because scrHLAtag is designed for use with single cell RNA data, ***only up to 3 field HLA nomenclature should be used***.  See https://hla.alleles.org/nomenclature/naming.html for more details about HLA nomenclature.
-2. The hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  *Current version: 3.51.*
+2. The hla reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  *Current version: 3.52*
 3. Because the `*` character is not fasta friendly, the `|` character is used instead as a separator.  The alleles_file should still contain * however.
 
 
