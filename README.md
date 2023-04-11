@@ -23,6 +23,7 @@ To install scrHLAtag:
 ### Updates
 
 **version 0.1.1** - 4/11/23 - returns name of molecule in molecule_info and optionally sequence
+
 **version 0.1.0** - 4/9/23 - first stable version.  Implements both transcriptomic and genomic options
 
 ### Usage
