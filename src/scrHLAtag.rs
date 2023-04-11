@@ -1,6 +1,6 @@
 /**
 
-~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out -l transcriptome
+~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out -l transcriptome -s
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_dedup.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
 
 
@@ -48,6 +48,7 @@ pub struct InputParams {
     pub alleles_file: String,
     pub output_path: Box<Path>,
     pub verbose: bool,
+    pub return_sequence: bool, 
     pub cb_tag: String,
     pub umi_tag: String,
     pub level: String,
@@ -136,6 +137,10 @@ pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
     let umi = params.value_of("umi").unwrap_or("XM").to_string();
     let output = params.value_of("output_folder").unwrap_or("out").to_string();
     let threads = params.value_of("threads").unwrap_or("1").to_string().parse::<usize>().unwrap();
+    let mut return_sequence = false;
+    if params.is_present("return_sequence") {
+        return_sequence = true;
+    }
     let mut verbose = false;
     if params.is_present("verbose") {
         verbose = true;
@@ -147,6 +152,7 @@ pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
             alleles_file: alleles_file,
             output_path: outpath.into(),
             verbose: verbose,
+            return_sequence: return_sequence,
             // hla_ref: hla_ref.to_string(),
             cb_tag: cb,
             umi_tag: umi,
@@ -218,6 +224,7 @@ pub fn check_params(params: InputParams) -> Result<InputParams, Box<dyn Error>>{
             alleles_file: params.alleles_file,
             output_path: params.output_path,
             verbose: params.verbose,
+            return_sequence: params.return_sequence,
             // hla_ref: hla_ref.to_string(),
             cb_tag: params.cb_tag,
             umi_tag: params.umi_tag,
@@ -602,6 +609,7 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                 mapped_count+=1;
                 let rec = record.as_ref().unwrap();
                 let index = rec.ref_id() as usize;
+                let name = rec.name();
                 // eprintln!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]);
                 data.push(format!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]));
 
@@ -633,8 +641,12 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                             0.0
                         },
                 };
-                // columns cb, umi, seqname, star, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence)
-                molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {}\n", &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
+                // columns cb, umi, seqname, query_len, start, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence)
+                if run.params.return_sequence {
+                    molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.query_len(), rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag, String::from_utf8_lossy(&rec.sequence().to_vec())));
+                } else {
+                    molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
+                }
                 
         }
     }

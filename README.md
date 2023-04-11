@@ -22,6 +22,7 @@ To install scrHLAtag:
 
 ### Updates
 
+**version 0.1.1** - 4/11/23 - returns name of molecule in molecule_info and optionally sequence
 **version 0.1.0** - 4/9/23 - first stable version.  Implements both transcriptomic and genomic options
 
 ### Usage
@@ -59,7 +60,7 @@ DQB1*04:02:01
 ##### Help menu
 
 ```sh
-scrHLAtag 0.1.0
+scrHLAtag 0.1.1
 copyright Scott Furlan
 scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell
 libraries
@@ -69,6 +70,7 @@ USAGE:
 
 FLAGS:
     -h, --help       Prints help information
+    -s, --ret_seq    include this flag to return sequence in molecule_info text file
     -V, --version    Prints version information
     -v, --verbose    verbose
 
@@ -94,8 +96,8 @@ counts_gene.txt.gz                   = counts file; columns: CB, UMI, allele, re
 counts._mRNAtxt.gz                   = counts file; columns: CB, UMI, allele, read_count
 align_gene.fa                        = fasta reference file used for minimap2 alignment
 align_mRNA.fa                        = fasta reference file used for minimap2 alignment
-molecules_info_gene.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de)
-molecules_info_mRNA.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de)
+molecules_info_gene.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de); optionally including string in the last column
+molecules_info_mRNA.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de); optionally including sequence in the last column
 ```
 See minimap2 manual (https://lh3.github.io/minimap2/minimap2.html) for a discussion of the molecule_info metrics
 
