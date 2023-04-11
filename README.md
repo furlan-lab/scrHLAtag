@@ -97,7 +97,7 @@ counts_gene.txt.gz                   = counts file; columns: CB, UMI, allele, re
 counts._mRNAtxt.gz                   = counts file; columns: CB, UMI, allele, read_count
 align_gene.fa                        = fasta reference file used for minimap2 alignment
 align_mRNA.fa                        = fasta reference file used for minimap2 alignment
-molecules_info_gene.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de); optionally including string in the last column
+molecules_info_gene.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de); optionally including sequence in the last column
 molecules_info_mRNA.txt.gz           = a file listing alignment metrics for each molecule; columns: CB, UMI, allele, start_pos, mapq, cigar, NM, AS, s1, de); optionally including sequence in the last column
 ```
 See minimap2 manual (https://lh3.github.io/minimap2/minimap2.html) for a discussion of the molecule_info metrics
