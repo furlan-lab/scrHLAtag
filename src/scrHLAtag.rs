@@ -2,7 +2,8 @@
 
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out -l transcriptome -s
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_dedup.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
-
+~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_corrected_sorted.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
+~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/mini_corrected_sorted.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
 
 **/
 // scrHLA typing, alignment, : single cell rna-based HLA typing and alignment
@@ -31,6 +32,7 @@ use itertools::Itertools;
 use kseq::parse_path;
 use simple_log::LogConfigBuilder;
 use simple_log::{info, warn, error};
+use toml::from_str;
 
 
 
@@ -359,6 +361,11 @@ pub fn make_fastq (params: &InputParams)-> Result<(), Box<dyn Error>> {
     let cb_b = pop2(&binding);
     let binding = params.umi_tag.as_bytes().to_vec();
     let umi_b = pop2(&binding);
+    let binding = "nb".as_bytes().to_vec();
+    let nb_b = pop2(&binding);
+    let mut nb_present = false;
+    let mut nb = 0;
+    let mut new_readname: String = Default::default();
 
     // set counters
     let mut total_count: usize = 0;
@@ -416,7 +423,21 @@ pub fn make_fastq (params: &InputParams)-> Result<(), Box<dyn Error>> {
                 continue
             },
         }
-        let new_readname = format!("{}{}{}_{}",&old_readname, &split, cb, umi );
+        match rec.tags().get(&nb_b) {
+            Some( bam::record::tags::TagValue::Int(nba, _)) => {
+                nb_present = true;
+                nb = nba;
+            },
+            _ => {
+                nb_present = false;
+            },
+        }
+        if nb_present {
+            new_readname = format!("{}{}{}_{}_nb_{}",&old_readname, &split, cb, umi, nb);
+        } else {
+            new_readname = format!("{}{}{}_{}",&old_readname, &split, cb, umi );
+        }
+        
         
         // write to fastq.gz
         let new_record: OwnedRecord = OwnedRecord{head: new_readname.as_bytes().to_vec(),
@@ -572,6 +593,9 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
     let mut err_count: usize = 0;
     let mut unmapped_count: usize = 0;
     let mut mapped_count: usize = 0;
+    let mut bc_perfect_count = 0;
+    let mut bc_imperfect_count = 0;
+    let mut bc_notfound_count = 0;
 
     // bam reader and get seqnames
     let bam_reader = bam::BamReader::from_path(bam_file, calc_threads(&run.params)).unwrap();
@@ -595,8 +619,16 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                 continue
             },
         };
-        let cbumi = readname.split(&split).nth(1).unwrap();
+        let mut cbumi = readname.split(&split).nth(1).unwrap();
+        let mut nb_present = false;
+        let mut nb: i32 = 0;
         // eprintln!("{}", &cbumi);
+        if cbumi.contains("_nb_") {
+            nb_present = true;
+            nb = cbumi.split("_nb_").nth(1).unwrap().parse::<i32>().unwrap();
+            // nb = from_str::<i32>(cbumi.split("_nb_").nth(1).unwrap()).unwrap();
+            cbumi  = cbumi.split("_nb_").nth(0).unwrap();
+        }
         let cb = cbumi.split("_").nth(0);
         let umi = cbumi.split("_").nth(1);
         if record.as_ref().unwrap().ref_id() < 0 {
@@ -630,30 +662,67 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                 let s1_tag = match rec.tags().get(b"s1") {
                     Some(TagValue::Int(value, _)) => value,
                     _ => {
-                            warn!("AS tag not returned correctly for read {:?}", rec.name());
+                            warn!("s1 tag not returned correctly for read {:?}", rec.name());
                             0
                         },
                 };
                 let de_tag = match rec.tags().get(b"de") {
                     Some(TagValue::Float(value)) => value,
                     _ => {
-                            warn!("AS tag not returned correctly for read {:?}", rec.name());
+                            warn!("de tag not returned correctly for read {:?}", rec.name());
                             0.0
                         },
                 };
-                // columns cb, umi, seqname, query_len, start, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence)
-                if run.params.return_sequence {
-                    molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.query_len(), rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag, String::from_utf8_lossy(&rec.sequence().to_vec())));
-                } else {
-                    molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
+
+                let _de_tag = match rec.tags().get(b"nb") {
+                    Some(TagValue::Int(value, _)) =>  value,  
+                    _ => {  
+                            // let e = rec.tags().get(b"nb");
+                            // eprintln!("{:?}", e);
+                            warn!("nb tag not returned correctly for read {:?}", rec.name());
+                            -1
+                        },
+                };
+
+                if nb_present {
+                    if nb == 0 {
+                        bc_perfect_count+=1
+                    } else {
+                        if nb < 0 {
+                            bc_notfound_count+=1
+                        }
+                        if nb > 0 {
+                            bc_imperfect_count+=1
+                        }
+                    }
+                    // columns cb, nb, umi, seqname, query_len, start, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence), seq (optional)
+                    if run.params.return_sequence {
+                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), nb, &umi.unwrap(), seqnames[index], rec.query_len(), rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag, String::from_utf8_lossy(&rec.sequence().to_vec())));
+                    } else {
+                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), nb, &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
+                    }
+                } else{
+                    // columns cb, umi, seqname, query_len, start, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence), seq (optional)
+                    if run.params.return_sequence {
+                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.query_len(), rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag, String::from_utf8_lossy(&rec.sequence().to_vec())));
+                    } else {
+                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
+                    }
                 }
+                
                 
         }
     }
     info!("\t\t\tTotal reads processed: {}\tReads with errors: {}", total_count, err_count);
     info!("\t\t\tUnmapped reads: {}\tMapped reads: {}", unmapped_count, mapped_count);
+    if bc_perfect_count + bc_notfound_count + bc_imperfect_count > 0 {
+        info!("\tPerfect Barcodes: {}\n\tCorrected Barcodes: {}\n\tUnmatchable Barcodes: {}\n", bc_perfect_count, bc_imperfect_count, bc_notfound_count);
+    }
     if run.params.verbose {
         eprintln!("\tTotal reads processed: {}\n\tReads with errors: {}\n\tUnmapped reads: {}\n\tMapped reads: {}\n", total_count, err_count, unmapped_count, mapped_count);
+        if bc_perfect_count + bc_notfound_count + bc_imperfect_count > 0 {
+            eprintln!("\tPerfect Barcodes: {}\n\tCorrected Barcodes: {}\n\tUnmatchable Barcodes: {}\n", bc_perfect_count, bc_imperfect_count, bc_notfound_count);
+        }
     }
     data.sort();
     let mut out_vec = Vec::new();
