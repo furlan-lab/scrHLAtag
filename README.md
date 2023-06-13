@@ -21,6 +21,7 @@ To install scrHLAtag:
 5. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
 ### Updates
+**version 0.1.4** - 6/13/23 - added a feature "hla_sep" which allows the user to define the "string separator" character - i.e. B\*48:01:01 where \* is the "string separator"
 
 **version 0.1.3** - 6/12/23 - if no alleles file is supplied - now runs against all alleles in the database
 
@@ -65,7 +66,7 @@ DQB1*04:02:01
 ##### Help menu
 
 ```sh
-scrHLAtag 0.1.3
+scrHLAtag 0.1.4
 copyright Scott Furlan
 scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell
 libraries
@@ -74,7 +75,7 @@ USAGE:
     scrHLAtag [FLAGS] [OPTIONS] --bam <bam>
 
 FLAGS:
-    -h, --help       Prints help information
+        --help       Prints help information
     -s, --ret_seq    include this flag to return sequence in molecule_info text file
     -V, --version    Prints version information
     -v, --verbose    verbose
@@ -85,6 +86,7 @@ OPTIONS:
                                     alleles in database
     -b, --bam <bam>                 input bam
     -c, --cb_tag <cb>               character to parse cell barcode; default = 'CB'
+    -h, --hla_sep <hsep>            character to separate HLA allele names; default = '*'
     -o, --out <output_folder>       folder for output; default 'out'
     -t, --threads <threads>         threads
     -u, --umi_tag <umi>             character to parse umi; default = 'XM'

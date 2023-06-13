@@ -64,6 +64,7 @@ pub struct InputParams {
     pub threads: usize,
     pub alleles_file: String,
     pub output_path: Box<Path>,
+    pub hla_sep: String,
     pub verbose: bool,
     pub return_sequence: bool, 
     pub cb_tag: String,
@@ -155,6 +156,7 @@ pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
     let level = params.value_of("align_level").unwrap_or("both").to_string();
     let cb = params.value_of("cb").unwrap_or("CB").to_string();
     let umi = params.value_of("umi").unwrap_or("XM").to_string();
+    let hla_sep = params.value_of("hsep").unwrap_or("*").to_string();
     let output = params.value_of("output_folder").unwrap_or("out").to_string();
     let threads = params.value_of("threads").unwrap_or("1").to_string().parse::<usize>().unwrap();
     let mut return_sequence = false;
@@ -173,6 +175,7 @@ pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
             output_path: outpath.into(),
             verbose: verbose,
             return_sequence: return_sequence,
+            hla_sep: hla_sep.to_string(),
             // hla_ref: hla_ref.to_string(),
             cb_tag: cb,
             umi_tag: umi,
@@ -252,6 +255,7 @@ pub fn check_params(mut params: InputParams) -> Result<InputParams, Box<dyn Erro
             threads: params.threads,
             alleles_file: params.alleles_file,
             output_path: params.output_path,
+            hla_sep: params.hla_sep,
             verbose: params.verbose,
             return_sequence: params.return_sequence,
             // hla_ref: hla_ref.to_string(),
@@ -631,7 +635,8 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
     let header = bam_reader.header().clone();
     let hdata = header.reference_names();
     for seq in hdata {
-        seqnames.push(seq)
+        let seq_fixed = seq.replace("|", &run.params.hla_sep);
+        seqnames.push(seq_fixed)
     }
 
     // count
