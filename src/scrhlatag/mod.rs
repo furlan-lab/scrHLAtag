@@ -1,10 +1,25 @@
 /**
-
+cd ~/develop/scrHLAtag
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out -l transcriptome -s
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_dedup.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_corrected_sorted.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/mini_corrected_sorted.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
 
+~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -o out -l transcriptome -s
+
+
+#makes all alleles file
+
+zcat < HLA_DB_3field_gene.fa.gz | grep -e ">" - > all_alleles.tmp
+zcat < HLA_DB_3field_mRNA.fa.gz | grep -e ">" - >> all_alleles.tmp
+R
+library(tidyr)
+d<-read.table("all_alleles.tmp")[,1] %>% gsub(">", "", .) %>% gsub("\\|", "*", .)
+d<-unique(d)
+write.table(d, "all_alleles.tsv", row.names=F, quote=F, col.names=F)
+q()
+n
+rm all_alleles.tmp
 **/
 // scrHLA typing, alignment, : single cell rna-based HLA typing and alignment
 // this program takes a pacbio bam and performs alignment and prediction
@@ -32,7 +47,7 @@ use itertools::Itertools;
 use kseq::parse_path;
 use simple_log::LogConfigBuilder;
 use simple_log::{info, warn, error};
-use toml::from_str;
+// use toml::from_str;
 
 
 
@@ -133,7 +148,10 @@ pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
     let params = App::from_yaml(yaml).get_matches();
     // eprintln!("{:?}", params);
     let bam = params.value_of("bam").unwrap().to_string();
-    let alleles_file = params.value_of("alleles_file").unwrap().to_string();
+    let mut alleles_file = "none_provided".to_string();
+    if params.is_present("alleles_file") {
+        alleles_file = params.value_of("alleles_file").unwrap().to_string();
+    }
     let level = params.value_of("align_level").unwrap_or("both").to_string();
     let cb = params.value_of("cb").unwrap_or("CB").to_string();
     let umi = params.value_of("umi").unwrap_or("XM").to_string();
@@ -163,7 +181,7 @@ pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
 }
 
 
-pub fn check_params(params: InputParams) -> Result<InputParams, Box<dyn Error>>{
+pub fn check_params(mut params: InputParams) -> Result<InputParams, Box<dyn Error>>{
     let _cu = cleanup(&params.output_path.join("scrHLAtag.log"), false);
     let config = LogConfigBuilder::builder()
         .path(params.output_path.join("scrHLAtag.log").to_str().unwrap())
@@ -174,7 +192,7 @@ pub fn check_params(params: InputParams) -> Result<InputParams, Box<dyn Error>>{
         .output_file()
         .build();
     let _ = simple_log::new(config);
-    let allowables = vec!["genome".to_string(), "transcrptome".into(), "both".into()];
+    let allowables = vec!["genome".to_string(), "transcriptome".into(), "both".into()];
     if !allowables.contains(&params.level){
         error!("\t\tInput 'level' parameter is not valid.  User supplied {}", params.level);
         panic!("Input 'level' parameter is not valid.  User supplied {}", params.level);
@@ -219,6 +237,15 @@ pub fn check_params(params: InputParams) -> Result<InputParams, Box<dyn Error>>{
             }
             fs::create_dir(&params.output_path)?;
         }
+    }
+    if params.alleles_file == "none_provided" {
+        info!("\t\tNo alleles file provided, running against all alleles!");
+        if params.verbose {
+            eprintln!("No alleles file provided, running against all alleles!");
+        }
+        let package_dir_path = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let all_alleles_file = package_dir_path.join("data/all_alleles.tsv");
+        params.alleles_file = all_alleles_file.to_str().unwrap().to_string();
     }
     Ok(InputParams{
             bam: params.bam,

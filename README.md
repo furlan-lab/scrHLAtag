@@ -63,13 +63,13 @@ DQB1*04:02:01
 ##### Help menu
 
 ```sh
-scrHLAtag 0.1.2
+scrHLAtag 0.1.3
 copyright Scott Furlan
 scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell
 libraries
 
 USAGE:
-    scrHLAtag [FLAGS] [OPTIONS] --alleles <alleles_file> --bam <bam>
+    scrHLAtag [FLAGS] [OPTIONS] --bam <bam>
 
 FLAGS:
     -h, --help       Prints help information
@@ -79,7 +79,8 @@ FLAGS:
 
 OPTIONS:
     -l, --level <align_level>       align to 'genome', 'transcriptome', or 'both'; default is 'both'
-    -a, --alleles <alleles_file>    table of hla genes to search for (tsv file)
+    -a, --alleles <alleles_file>    table of hla genes to search for (tsv file); if not supplied will run against all
+                                    alleles in database
     -b, --bam <bam>                 input bam
     -c, --cb_tag <cb>               character to parse cell barcode; default = 'CB'
     -o, --out <output_folder>       folder for output; default 'out'

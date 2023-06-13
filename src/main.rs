@@ -1,9 +1,10 @@
 #![allow(non_snake_case)]
-#![allow(unused_imports)]
+// #![allow(unused_imports)]
 #[macro_use] extern crate arrayref;
 
 use simple_log::LogConfigBuilder;
 use simple_log::info;
+// use std::path::Path;
 
 
 pub mod scrhlatag;
@@ -11,7 +12,8 @@ use crate::scrhlatag::*;
 fn main() {
 
     let params = load_params().unwrap();
-    let checked_params = load_params().unwrap();
+    let in_params = load_params().unwrap();
+    let checked_params = check_params(in_params).unwrap();
     if checked_params.verbose {
         eprintln!("Writing log file: '{}'", &checked_params.output_path.join("scrHLAtag.log").to_str().unwrap());
     }
@@ -27,7 +29,10 @@ fn main() {
     let _ = simple_log::new(config);
 
     let runs = create_runs(&checked_params);
+
     let alleles_query = read_allelesfile(&checked_params);
+
+    
     info!("\t\t\t\tRunning with {} thread(s)!", &checked_params.threads);
     if checked_params.verbose {
         eprintln!("Running with {} thread(s)!", &checked_params.threads);
