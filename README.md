@@ -22,6 +22,8 @@ To install scrHLAtag:
 
 ### Updates
 
+**version 0.1.3** - 6/12/23 - if no alleles file is supplied - now runs against all alleles in the database
+
 **version 0.1.2** - 4/26/23 - returns nb tag (read more about nb tag here: https://isoseq.how/umi/isoseq-correct.html) in molecule_info file if present in input bam file
 
 **version 0.1.1** - 4/11/23 - returns name of molecule in molecule_info and optionally sequence
