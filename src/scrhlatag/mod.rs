@@ -1,5 +1,6 @@
 /**
 cd ~/develop/scrHLAtag
+cargo build --release && cp target/release/scrHLAtag ~/.local/bin
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/test.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out -l transcriptome -s
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_dedup.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
 ~/develop/scrHLAtag/target/release/scrHLAtag -v -b ~/develop/scrHLAtag/data/full_corrected_sorted.bam -a ~/develop/scrHLAtag/data/testhla.tsv -o out
@@ -651,7 +652,14 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                 continue
             },
         };
-        let mut cbumi = readname.split(&split).nth(1).unwrap();
+        let mut cbumi = if readname.split(&split).nth(1).is_some()
+            {
+                readname.split(&split).nth(1).unwrap().to_string()
+            } else {
+                "not_found";
+                continue
+            };
+        
         let mut nb_present = false;
         let mut nb: i32 = 0;
         // eprintln!("{}", &cbumi);
@@ -659,7 +667,7 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
             nb_present = true;
             nb = cbumi.split("_nb_").nth(1).unwrap().parse::<i32>().unwrap();
             // nb = from_str::<i32>(cbumi.split("_nb_").nth(1).unwrap()).unwrap();
-            cbumi  = cbumi.split("_nb_").nth(0).unwrap();
+            cbumi  = cbumi.split("_nb_").nth(0).unwrap().to_string();
         }
         let cb = cbumi.split("_").nth(0);
         let umi = cbumi.split("_").nth(1);
@@ -676,7 +684,16 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                 let name = rec.name();
                 // eprintln!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]);
                 data.push(format!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]));
-
+                if cb.is_none(){
+                    err_count+=1;
+                    warn!("CB tag not returned correctly for read {:?}", str::from_utf8(rec.name()).unwrap());
+                    continue
+                }
+                if cb.is_none(){
+                    err_count+=1;
+                    warn!("CB tag not returned correctly for read {:?}", str::from_utf8(rec.name()).unwrap());
+                    continue
+                }
                 let nm_tag = match rec.tags().get(b"NM") {
                     Some(TagValue::Int(value, _)) => value,
                     _ => {

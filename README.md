@@ -21,6 +21,8 @@ To install scrHLAtag:
 5. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
 ### Updates
+**version 0.1.5** - 6/15/23 - added more checking for all components of a count before writing (i.e. will skip a read if cb, umi, or name is not present)
+
 **version 0.1.4** - 6/13/23 - added a feature "hla_sep" which allows the user to define the "string separator" character - i.e. B\*48:01:01 where \* is the "string separator"
 
 **version 0.1.3** - 6/12/23 - if no alleles file is supplied - now runs against all alleles in the database
