@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 // #![allow(unused_imports)]
-#[macro_use] extern crate arrayref;
+#[macro_use] 
+
+extern crate arrayref;
 
 use simple_log::LogConfigBuilder;
 use simple_log::info;

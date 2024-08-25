@@ -44,7 +44,7 @@ use std::{
     str,
 };
 
-use bam::{BamReader, record::tags::TagValue};
+use bam::{BamReader, record::tags::TagValue, record::tags::StringType};
 use clap::{App, load_yaml};
 use csv::ReaderBuilder;
 use fastq::{OwnedRecord, Record};
@@ -55,7 +55,7 @@ use noodles_fasta::{self as fasta, record::{Definition, Sequence}};
 use serde::Deserialize;
 use simple_log::{info, warn, error, LogConfigBuilder};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq, Ord, PartialOrd, Eq)]
 pub struct HLAalleles {
     allele: String,
 }
@@ -95,7 +95,7 @@ pub fn create_runs(params: &InputParams) -> Vec<Run> {
     let package_dir_path = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut runs = Vec::new();
 
-    let add_run = |level: &str, hla_ref: &str| {
+    let mut add_run = |level: &str, hla_ref: &str| {
         runs.push(Run {
             level: AlignmentLevel {
                 file_tag: "mRNA".to_string(),
@@ -206,35 +206,70 @@ pub fn read_allelesfile(params: &InputParams) -> Vec<HLAalleles> {
     alleles
 }
 
-pub fn make_partial_reference(alleles_query: &Vec<HLAalleles>, run: &Run) -> Result<Vec<String>, Box<dyn Error>> {
-    let mut names: HashMap<String, usize> = HashMap::new();
-    info!("Read HLA reference file: '{}'", run.level.hla_ref.to_str().unwrap());
+fn parse_fasta_header (input: String)-> String {
+    let chunks: Vec<_> = input.split(" ").collect();
+    let substring1 = chunks[0].replace(">", "").replace("|", "*");
+    return substring1
+}
 
-    let records = parse_path(&run.level.hla_ref)?.iter_record()?;
-    for (i, record) in records.enumerate() {
-        names.insert(parse_fasta_header(record.head().to_string()), i + 1);
+
+pub fn make_partial_reference(alleles_query: &[HLAalleles], run: &Run) -> Result<Vec<String>, Box<dyn Error>> {
+    let mut names: HashMap<String, usize> = HashMap::new();
+    let mut i: usize = 0;
+
+    info!("\t\tRead HLA reference file: '{}'", run.level.hla_ref.to_str().unwrap());
+    if run.params.verbose {
+        eprintln!("Read HLA reference file: '{}'", run.level.hla_ref.to_str().unwrap());
     }
 
-    let align_fasta = File::create(&run.level.mini_fasta)?;
-    let mut fasta_writer = fasta::writer::Builder::default().build_with_writer(BufWriter::new(align_fasta));
+    let mut records = parse_path(&run.level.hla_ref).unwrap();
+    while let Some(record) = records.iter_record().unwrap() {
+        i = i+1;
+        names.insert(parse_fasta_header(record.head().to_string()), i);
+    }
 
-    let mut names_out = Vec::new();
-    for record in parse_path(&run.level.hla_ref)?.iter_record()? {
-        if let Some(_) = names.get(&parse_fasta_header(record.head().to_string())) {
-            names_out.push(record.head().to_string());
-            let definition = Definition::new(record.head().to_string(), None);
-            let sequence = Sequence::from(record.seq().to_string().into_bytes());
-            fasta_writer.write_record(&noodles_fasta::record::Record::new(definition, sequence))?;
+
+    let mut simpleindices: Vec<usize> = Vec::new();
+    for data in alleles_query {
+        if let Some(&matched) = names.get(&data.allele) {
+            info!("\t\t\tFound: {}", &data.allele);
+            if run.params.verbose {
+                eprintln!("\tFound: {}", &data.allele);
+            }
+            simpleindices.push(matched);
+        } else {
+            warn!("\t\tCould not find: {}", &data.allele);
+            if run.params.verbose {
+                eprintln!("Could not find: {}", &data.allele);
+            }
         }
     }
 
+    let align_fasta = run.level.mini_fasta.to_str().unwrap();
+    let file = File::create(align_fasta)?;
+    let mut fasta_writer = fasta::writer::Builder::default().build_with_writer(BufWriter::new(file));
+
+    let mut names_out: Vec<String> = Vec::new();
+    
+    let mut records = parse_path(&run.level.hla_ref)?;
+    i = 0;
+    while let Some(record) = records.iter_record()? {
+        i += 1;
+        if simpleindices.contains(&i) {
+            let header = record.head().to_string();
+            names_out.push(header.clone());
+
+            let definition = Definition::new(header, None);
+            let sequence = Sequence::from(record.seq().to_string().into_bytes());
+            let fasta_record = noodles_fasta::record::Record::new(definition, sequence);
+
+            fasta_writer.write_record(&fasta_record)?;
+        }
+    }
+
+
     Ok(names_out)
 }
-
-fn parse_fasta_header(input: String) -> String {
-    input.split_whitespace().next().unwrap_or("").replace(">", "").replace("|", "*")
-}
-
 pub fn test_progs(software: String) -> Result<(), Box<dyn Error>> {
     Command::new(software.clone())
         .arg("-h")
@@ -247,6 +282,16 @@ pub fn test_progs(software: String) -> Result<(), Box<dyn Error>> {
 
 fn calc_threads(params: &InputParams) -> u16 {
     if params.threads > 2 { params.threads as u16 - 1 } else { 0 }
+}
+
+fn convert_tag_value(tag: TagValue) -> String {
+    match tag {
+        TagValue::Char(v) => v.to_string(),
+        TagValue::Int(v, _) => v.to_string(),
+        TagValue::Float(v) => v.to_string(),
+        TagValue::String(v, _) => str::from_utf8(v).unwrap().to_string(),
+        _ => 0.to_string()
+    }
 }
 
 pub fn make_fastq(params: &InputParams) -> Result<(), Box<dyn Error>> {
@@ -293,10 +338,10 @@ pub fn make_fastq(params: &InputParams) -> Result<(), Box<dyn Error>> {
         };
 
         let nb_present = rec.tags().get(&nb_b).is_some();
-        let nb = if nb_present { rec.tags().get(&nb_b).unwrap().to_i32() } else { 0 };
+        let nb = if nb_present { rec.tags().get(&nb_b).unwrap() } else { TagValue::Char(0)  };
 
         let new_readname = if nb_present {
-            format!("{}{}{}_{}_nb_{}", old_readname, split, cb, umi, nb)
+            format!("{}{}{}_{}_nb_{}", old_readname, split, cb, umi, convert_tag_value(nb))
         } else {
             format!("{}{}{}_{}", old_readname, split, cb, umi)
         };
@@ -569,10 +614,10 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>) {
 fn format_molecule_data(
     rec: &bam::Record, cb: &str, nb: i32, umi: &str, seqname: &str, return_sequence: bool,
 ) -> String {
-    let nm_tag = rec.tags().get(b"NM").and_then(TagValue::to_i32).unwrap_or(-1);
-    let as_tag = rec.tags().get(b"AS").and_then(TagValue::to_i32).unwrap_or(0);
-    let s1_tag = rec.tags().get(b"s1").and_then(TagValue::to_i32).unwrap_or(0);
-    let de_tag = rec.tags().get(b"de").and_then(TagValue::to_f32).unwrap_or(0.0);
+    let nm_tag = rec.tags().get(b"NM").unwrap_or(TagValue::String("-1".as_bytes(), StringType::String));
+    let as_tag = rec.tags().get(b"AS").unwrap_or(TagValue::Char(0));
+    let s1_tag = rec.tags().get(b"s1").unwrap_or(TagValue::Char(0));
+    let de_tag = rec.tags().get(b"de").unwrap_or(TagValue::String("0.0".as_bytes(), StringType::String));
 
     if return_sequence {
         format!(
@@ -586,15 +631,15 @@ fn format_molecule_data(
             rec.start(),
             rec.mapq(),
             rec.cigar(),
-            nm_tag,
-            as_tag,
-            s1_tag,
-            de_tag,
-            str::from_utf8(&rec.sequence()).unwrap_or_default()
+            convert_tag_value(nm_tag),
+            convert_tag_value(as_tag),
+            convert_tag_value(s1_tag),
+            convert_tag_value(de_tag),
+            str::from_utf8(&rec.sequence().to_vec()).unwrap_or_default()
         )
     } else {
         format!(
-            "{} {} {} {} {} {} {} {} {} {} {} {}\n",
+            "{} {} {} {} {} {} {} {} {} {} {} {} {}\n",
             str::from_utf8(rec.name()).unwrap_or_default(),
             cb,
             nb,
@@ -604,10 +649,10 @@ fn format_molecule_data(
             rec.start(),
             rec.mapq(),
             rec.cigar(),
-            nm_tag,
-            as_tag,
-            s1_tag,
-            de_tag
+            convert_tag_value(nm_tag),
+            convert_tag_value(as_tag),
+            convert_tag_value(s1_tag),
+            convert_tag_value(de_tag)
         )
     }
 }
