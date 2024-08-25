@@ -26,7 +26,6 @@ rm all_alleles.tmp
 // this program takes a pacbio bam and performs alignment and prediction
 // single cell hla typing, alignment, and grouping - scrHLAtag
 
-
 extern crate csv;
 extern crate clap;
 extern crate serde;
@@ -34,29 +33,31 @@ extern crate bam;
 extern crate fastq;
 extern crate kseq;
 
+use std::{
+    collections::HashMap,
+    env,
+    error::Error,
+    fs::{self, File},
+    io::{BufReader, BufWriter, Write},
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    str,
+};
 
-use std::{env, io::Write, str, fs, fs::File, error::Error, path::{Path, PathBuf}, collections::HashMap, process::{Command, Stdio }};
-use std::io::{ BufReader, BufWriter};
-use clap::{App, load_yaml};
-use serde::Deserialize;
-use csv::ReaderBuilder;
-use noodles_fasta::{self as fasta, record::{Definition, Sequence}};
 use bam::{BamReader, record::tags::TagValue};
-use flate2::{Compression, GzBuilder};
+use clap::{App, load_yaml};
+use csv::ReaderBuilder;
 use fastq::{OwnedRecord, Record};
+use flate2::{Compression, GzBuilder};
 use itertools::Itertools;
 use kseq::parse_path;
-use simple_log::LogConfigBuilder;
-use simple_log::{info, warn, error};
-// use toml::from_str;
-
-
-
-
+use noodles_fasta::{self as fasta, record::{Definition, Sequence}};
+use serde::Deserialize;
+use simple_log::{info, warn, error, LogConfigBuilder};
 
 #[derive(Deserialize)]
 pub struct HLAalleles {
-    allele: String
+    allele: String,
 }
 
 #[derive(Clone)]
@@ -67,7 +68,7 @@ pub struct InputParams {
     pub output_path: Box<Path>,
     pub hla_sep: String,
     pub verbose: bool,
-    pub return_sequence: bool, 
+    pub return_sequence: bool,
     pub cb_tag: String,
     pub umi_tag: String,
     pub level: String,
@@ -93,762 +94,569 @@ pub struct Run {
 pub fn create_runs(params: &InputParams) -> Vec<Run> {
     let package_dir_path = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut runs = Vec::new();
-    if params.level == "transcriptome" {
-        runs.push(Run{
-            level: AlignmentLevel{
-                file_tag: "mRNA".to_string(),
-                hla_ref: package_dir_path.join("data/HLA_DB_3field_mRNA.fa.gz"),
-                descriptor: "transcriptome".to_string(),
-                mini_fasta: params.output_path.join("align_mRNA.fa"),
-                out_unsorted_sam: params.output_path.join("Aligned_mm2_mRNA.sam"),
-                out_sorted_sam: params.output_path.join("Aligned_mm2_sorted_mRNA.sam"),
-                out_sorted_bam: params.output_path.join("Aligned_mm2_sorted_mRNA.bam"),
-                counts: params.output_path.join("counts_mRNA.txt.gz"),
-                molecule: params.output_path.join("molecule_info_mRNA.txt.gz"),
-            },
-            params: params.clone(),
-        });
-        return runs;
-    } else {
-        runs.push(Run{
-            level: AlignmentLevel{
-                file_tag: "mRNA".to_string(),
-                hla_ref: package_dir_path.join("data/HLA_DB_3field_gene.fa.gz"),
-                descriptor: "genome".to_string(),
-                mini_fasta: params.output_path.join("align_gene.fa"),
-                out_unsorted_sam: params.output_path.join("Aligned_mm2_gene.sam"),
-                out_sorted_sam: params.output_path.join("Aligned_mm2_sorted_gene.sam"),
-                out_sorted_bam: params.output_path.join("Aligned_mm2_sorted_gene.bam"),
-                counts: params.output_path.join("counts_gene.txt.gz"),
-                molecule: params.output_path.join("molecule_info_gene.txt.gz"),
-            },
-            params: params.clone(),
-        });
-        if params.level == "both" {
-            runs.push(Run{
-                level: AlignmentLevel{
-                    file_tag: "mRNA".to_string(),
-                    hla_ref: package_dir_path.join("data/HLA_DB_3field_mRNA.fa.gz"),
-                    descriptor: "transcriptome".to_string(),
-                    mini_fasta: params.output_path.join("align_mRNA.fa"),
-                    out_unsorted_sam: params.output_path.join("Aligned_mm2_mRNA.sam"),
-                    out_sorted_sam: params.output_path.join("Aligned_mm2_sorted_mRNA.sam"),
-                    out_sorted_bam: params.output_path.join("Aligned_mm2_sorted_mRNA.bam"),
-                    counts: params.output_path.join("counts_mRNA.txt.gz"),
-                    molecule: params.output_path.join("molecule_info_mRNA.txt.gz"),
-                },
-                params: params.clone(),
-            });
-        }
-        return runs
-    }
-}
 
+    let add_run = |level: &str, hla_ref: &str| {
+        runs.push(Run {
+            level: AlignmentLevel {
+                file_tag: "mRNA".to_string(),
+                hla_ref: package_dir_path.join(hla_ref),
+                descriptor: level.to_string(),
+                mini_fasta: params.output_path.join(format!("align_{}.fa", level)),
+                out_unsorted_sam: params.output_path.join(format!("Aligned_mm2_{}.sam", level)),
+                out_sorted_sam: params.output_path.join(format!("Aligned_mm2_sorted_{}.sam", level)),
+                out_sorted_bam: params.output_path.join(format!("Aligned_mm2_sorted_{}.bam", level)),
+                counts: params.output_path.join(format!("counts_{}.txt.gz", level)),
+                molecule: params.output_path.join(format!("molecule_info_{}.txt.gz", level)),
+            },
+            params: params.clone(),
+        });
+    };
+
+    match params.level.as_str() {
+        "transcriptome" => add_run("transcriptome", "data/HLA_DB_3field_mRNA.fa.gz"),
+        "genome" => add_run("genome", "data/HLA_DB_3field_gene.fa.gz"),
+        "both" => {
+            add_run("genome", "data/HLA_DB_3field_gene.fa.gz");
+            add_run("transcriptome", "data/HLA_DB_3field_mRNA.fa.gz");
+        }
+        _ => panic!("Invalid alignment level: {}", params.level),
+    }
+
+    runs
+}
 
 pub fn load_params() -> Result<InputParams, Box<dyn Error>> {
     let yaml = load_yaml!("../cli.yml");
     let params = App::from_yaml(yaml).get_matches();
-    // eprintln!("{:?}", params);
-    let bam = params.value_of("bam").unwrap().to_string();
-    let mut alleles_file = "none_provided".to_string();
-    if params.is_present("alleles_file") {
-        alleles_file = params.value_of("alleles_file").unwrap().to_string();
-    }
-    let level = params.value_of("align_level").unwrap_or("both").to_string();
-    let cb = params.value_of("cb").unwrap_or("CB").to_string();
-    let umi = params.value_of("umi").unwrap_or("XM").to_string();
-    let hla_sep = params.value_of("hsep").unwrap_or("*").to_string();
-    let output = params.value_of("output_folder").unwrap_or("out").to_string();
-    let threads = params.value_of("threads").unwrap_or("1").to_string().parse::<usize>().unwrap();
-    let mut return_sequence = false;
-    if params.is_present("return_sequence") {
-        return_sequence = true;
-    }
-    let mut verbose = false;
-    if params.is_present("verbose") {
-        verbose = true;
-    }
-    let outpath = Path::new(&output);
-    Ok(InputParams{
-            bam: bam,
-            threads: threads as usize,
-            alleles_file: alleles_file,
-            output_path: outpath.into(),
-            verbose: verbose,
-            return_sequence: return_sequence,
-            hla_sep: hla_sep.to_string(),
-            // hla_ref: hla_ref.to_string(),
-            cb_tag: cb,
-            umi_tag: umi,
-            level: level.to_string(),
+
+    Ok(InputParams {
+        bam: params.value_of("bam").unwrap().to_string(),
+        threads: params.value_of("threads").unwrap_or("1").parse::<usize>()?,
+        alleles_file: params.value_of("alleles_file").unwrap_or("none_provided").to_string(),
+        output_path: Path::new(params.value_of("output_folder").unwrap_or("out")).into(),
+        hla_sep: params.value_of("hsep").unwrap_or("*").to_string(),
+        verbose: params.is_present("verbose"),
+        return_sequence: params.is_present("return_sequence"),
+        cb_tag: params.value_of("cb").unwrap_or("CB").to_string(),
+        umi_tag: params.value_of("umi").unwrap_or("XM").to_string(),
+        level: params.value_of("align_level").unwrap_or("both").to_string(),
     })
 }
 
-
-pub fn check_params(mut params: InputParams) -> Result<InputParams, Box<dyn Error>>{
-    let _cu = cleanup(&params.output_path.join("scrHLAtag.log"), false);
-    let config = LogConfigBuilder::builder()
+pub fn check_params(params: InputParams) -> Result<InputParams, Box<dyn Error>> {
+    cleanup(&params.output_path.join("scrHLAtag.log"), false)?;
+    
+    let log_config = LogConfigBuilder::builder()
         .path(params.output_path.join("scrHLAtag.log").to_str().unwrap())
         .size(1 * 100)
         .roll_count(10)
-        .time_format("%Y-%m-%d %H:%M:%S.%f") //E.g:%H:%M:%S.%f
+        .time_format("%Y-%m-%d %H:%M:%S.%f")
         .level("info")
         .output_file()
         .build();
-    let _ = simple_log::new(config);
-    let allowables = vec!["genome".to_string(), "transcriptome".into(), "both".into()];
-    if !allowables.contains(&params.level){
-        error!("\t\tInput 'level' parameter is not valid.  User supplied {}", params.level);
-        panic!("Input 'level' parameter is not valid.  User supplied {}", params.level);
-    }
-    info!("\t\t\tStarting!");
-    let wdpb= get_current_working_dir().unwrap();
-    let wdir = wdpb.to_str().unwrap();
-    info!("\t\t\tCurrent working directory: '{}'", wdir);
-    if params.verbose {
-        eprintln!("\n\nCurrent working directory: '{}'", wdir);
-    }
-    if params.output_path.is_relative(){
-        let a1 = Path::new(wdir).join(&params.output_path);
-        let abs_outpath = a1.to_str().unwrap();
-        if params.output_path.exists() {
-                info!("\t\t\tFound existing output directory: '{}'", &abs_outpath);
-                warn!("\t\t\t{}", "Existing data in this folder could be lost!!!");
-               if params.verbose {
-                    eprintln!("Found existing output directory: '{}'", &abs_outpath);
-                    eprintln!("\t{}", "Existing data in this folder could be lost!!!");
-                }
-        } else {
-            info!("\t\tCreating output directory: '{}'", &abs_outpath);
-            if params.verbose {
-                eprintln!("Creating output directory: '{}'", &abs_outpath);
-            }
-            fs::create_dir(&params.output_path)?;
-        }
-    } else {
-        let abs_outpath = &params.output_path.to_str().unwrap();
-        if params.output_path.exists() {
-            info!("\t\tFound existing output directory: '{}'", &abs_outpath);
-            warn!("\t\t{}", "Existing data in this folder could be lost!!!");
-            if params.verbose {
-                eprintln!("Found existing output directory: '{}'", &abs_outpath);
-                eprintln!("\t{}", "Existing data in this folder could be lost!!!");
-            }
-        } else {
-            info!("\t\tCreating output directory: '{}'", &abs_outpath);
-            if params.verbose {
-                eprintln!("Creating output directory: '{}'", &abs_outpath);
-            }
-            fs::create_dir(&params.output_path)?;
-        }
-    }
-    if params.alleles_file == "none_provided" {
-        info!("\t\tNo alleles file provided, running against all alleles!");
-        if params.verbose {
-            eprintln!("No alleles file provided, running against all alleles!");
-        }
-        let package_dir_path = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let all_alleles_file = package_dir_path.join("data/all_alleles.tsv");
-        params.alleles_file = all_alleles_file.to_str().unwrap().to_string();
-    }
-    Ok(InputParams{
-            bam: params.bam,
-            threads: params.threads,
-            alleles_file: params.alleles_file,
-            output_path: params.output_path,
-            hla_sep: params.hla_sep,
-            verbose: params.verbose,
-            return_sequence: params.return_sequence,
-            // hla_ref: hla_ref.to_string(),
-            cb_tag: params.cb_tag,
-            umi_tag: params.umi_tag,
-            level: params.level,
-    })
-}
+    simple_log::new(log_config)?;
 
+    let allowables = vec!["genome", "transcriptome", "both"];
+    if !allowables.contains(&params.level.as_str()) {
+        error!("Input 'level' parameter is not valid: {}", params.level);
+        panic!("Invalid 'level' parameter: {}", params.level);
+    }
+
+    info!("Starting!");
+    let working_dir = get_current_working_dir()?.to_str().unwrap().to_string();
+    info!("Current working directory: '{}'", working_dir);
+
+    if params.output_path.is_relative() {
+        let abs_outpath = Path::new(&working_dir).join(&params.output_path).to_str().unwrap().to_string();
+        if params.output_path.exists() {
+            info!("Found existing output directory: '{}'", &abs_outpath);
+            warn!("Existing data in this folder could be lost!");
+        } else {
+            info!("Creating output directory: '{}'", &abs_outpath);
+            fs::create_dir(&params.output_path)?;
+        }
+    } else if params.output_path.exists() {
+        info!("Found existing output directory: '{}'", params.output_path.to_str().unwrap());
+        warn!("Existing data in this folder could be lost!");
+    } else {
+        info!("Creating output directory: '{}'", params.output_path.to_str().unwrap());
+        fs::create_dir(&params.output_path)?;
+    }
+
+    if params.alleles_file == "none_provided" {
+        info!("No alleles file provided, running against all alleles!");
+        let all_alleles_file = Path::new(env!("CARGO_MANIFEST_DIR")).join("data/all_alleles.tsv");
+        return Ok(InputParams { alleles_file: all_alleles_file.to_str().unwrap().to_string(), ..params });
+    }
+
+    Ok(params)
+}
 
 pub fn read_allelesfile(params: &InputParams) -> Vec<HLAalleles> {
-    info!("\t\tOpening alleles file: '{}'", &params.alleles_file.to_string());
-    if params.verbose {
-        eprintln!("Opening alleles file: '{}'", &params.alleles_file.to_string());
-    }
-    let file = File::open(&params.alleles_file.to_string()).unwrap();
+    info!("Opening alleles file: '{}'", params.alleles_file);
+
+    let file = File::open(&params.alleles_file).unwrap();
     let reader = BufReader::new(file);
-    let mut rdr = ReaderBuilder::new()
-        .has_headers(false)
-        .delimiter(b'\t')
-        .from_reader(reader);
-    let mut csvdata: Vec<String> = Vec::new();
-    for result in rdr.deserialize() {
-        csvdata.push(result.unwrap());
-    }
-    csvdata.sort();
-    csvdata.dedup();
-    let mut allele_vec: Vec<HLAalleles>  = Vec::new();
-    for data in csvdata {
-        let record: HLAalleles = HLAalleles{allele: data};
-        allele_vec.push(record);
-    }
-    allele_vec
+    let mut rdr = ReaderBuilder::new().has_headers(false).delimiter(b'\t').from_reader(reader);
+
+    let mut alleles: Vec<HLAalleles> = rdr.deserialize().filter_map(Result::ok).collect();
+    alleles.sort();
+    alleles.dedup();
+
+    alleles
 }
 
-
-/** "make_partial_reference" and its companion function "parse_fasta_header" take a fasta file 
- * and keep only those entries that match a list of HLA alleles passed as an allele_query. In doing so, 
- * it also parses the name to remove fasta friendly characters, replacing them with 
- * characters standard in HLA designations to match the characters in alleles_query.
- * 
- * It then writes a new fasta containing only the desired alleles in alleles_query.  It returns the names
- * of the entries for later writing into a bam header.
-**/
-pub fn make_partial_reference (alleles_query: &Vec<HLAalleles>, run: &Run) -> Result<Vec<String>, Box<dyn Error>>{
+pub fn make_partial_reference(alleles_query: &Vec<HLAalleles>, run: &Run) -> Result<Vec<String>, Box<dyn Error>> {
     let mut names: HashMap<String, usize> = HashMap::new();
-    let mut i: usize = 0;
-    info!("\t\tRead HLA reference file: '{}'", &run.level.hla_ref.to_str().unwrap());
-    if run.params.verbose {
-        eprintln!("Read HLA reference file: '{}'", &run.level.hla_ref.to_str().unwrap());
+    info!("Read HLA reference file: '{}'", run.level.hla_ref.to_str().unwrap());
+
+    let records = parse_path(&run.level.hla_ref)?.iter_record()?;
+    for (i, record) in records.enumerate() {
+        names.insert(parse_fasta_header(record.head().to_string()), i + 1);
     }
 
-    let mut records = parse_path(&run.level.hla_ref).unwrap();
-    while let Some(record) = records.iter_record().unwrap() {
-        i = i+1;
-        names.insert(parse_fasta_header(record.head().to_string()), i);
-    }
+    let align_fasta = File::create(&run.level.mini_fasta)?;
+    let mut fasta_writer = fasta::writer::Builder::default().build_with_writer(BufWriter::new(align_fasta));
 
-    let mut simpleindices = Vec::new();
-    for data in alleles_query {
-        let matched = names.get(&data.allele);
-        if matched.is_some(){
-            info!("\t\t\tFound: {}", &data.allele);
-            if run.params.verbose {
-                eprintln!("\tFound: {}", &data.allele);
-            }
-            simpleindices.push(*matched.unwrap())
-        } else{ 
-            warn!("\t\tCould not find: {}", &data.allele);
-            if run.params.verbose {
-                eprintln!("Could not find: {}", &data.allele)
-            }
-        };
-    }
-    i = 0;
-    let align_fasta_path = &run.level.mini_fasta;
-    let align_fasta = align_fasta_path.to_str().unwrap();
-    let f = File::create(align_fasta)?;
-
-    // write align.fasta
-    let mut fasta_writer = fasta::writer::Builder::default().build_with_writer(BufWriter::new(f));
     let mut names_out = Vec::new();
-    let mut records = parse_path(&run.level.hla_ref).unwrap();
-    while let Some(record) = records.iter_record().unwrap() {
-        i = i+1;
-        if simpleindices.contains(&i){
+    for record in parse_path(&run.level.hla_ref)?.iter_record()? {
+        if let Some(_) = names.get(&parse_fasta_header(record.head().to_string())) {
             names_out.push(record.head().to_string());
             let definition = Definition::new(record.head().to_string(), None);
-            let seq = record.seq().to_string().into_bytes();
-            let sequence = Sequence::from(seq);
-            let frecord = noodles_fasta::record::Record::new(definition, sequence);
-            let _fw = fasta_writer.write_record(&frecord);
+            let sequence = Sequence::from(record.seq().to_string().into_bytes());
+            fasta_writer.write_record(&noodles_fasta::record::Record::new(definition, sequence))?;
         }
     }
-    Ok(names_out.to_owned())
+
+    Ok(names_out)
 }
 
-
-fn parse_fasta_header (input: String)-> String {
-    let chunks: Vec<_> = input.split(" ").collect();
-    let substring1 = chunks[0].replace(">", "").replace("|", "*");
-    return substring1
+fn parse_fasta_header(input: String) -> String {
+    input.split_whitespace().next().unwrap_or("").replace(">", "").replace("|", "*")
 }
 
-
-pub fn test_progs (software: String) -> Result<(), Box<dyn Error>>{
-    let _output = Command::new(software.clone())
-                    .arg("-h")
-                    .stderr(Stdio::piped())
-                    .stdout(Stdio::piped())
-                     .output()
-                     .expect(&format!("\n\n*******Failed to execute {}*******\n\n", software));
+pub fn test_progs(software: String) -> Result<(), Box<dyn Error>> {
+    Command::new(software.clone())
+        .arg("-h")
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .output()
+        .expect(&format!("\n\n*******Failed to execute {}*******\n\n", software));
     Ok(())
 }
 
 fn calc_threads(params: &InputParams) -> u16 {
-    if params.threads>2{
-        (params.threads-1).try_into().unwrap()
-    } else {
-        0
-    }
-
+    if params.threads > 2 { params.threads as u16 - 1 } else { 0 }
 }
 
-#[allow(unused_assignments)]
-pub fn make_fastq (params: &InputParams)-> Result<(), Box<dyn Error>> {
-
-    // declare local variables
+pub fn make_fastq(params: &InputParams) -> Result<(), Box<dyn Error>> {
     let split = "|BARCODE=".to_string();
-    let fastq_path = &params.output_path.join("fastq.fq.gz");
+    let fastq_path = params.output_path.join("fastq.fq.gz");
     let bam_fn = Path::new(&params.bam);
-    // let cb_b: [u8; 2] = clone_into_array(&params.cb_tag.as_bytes().to_vec()[0..1]);
-    let binding = params.cb_tag.as_bytes().to_vec();
-    let cb_b = pop2(&binding);
-    let binding = params.umi_tag.as_bytes().to_vec();
-    let umi_b = pop2(&binding);
-    let binding = "nb".as_bytes().to_vec();
-    let nb_b = pop2(&binding);
-    let mut nb_present = false;
-    let mut nb = 0;
-    let mut new_readname: String = Default::default();
+    let cb_b = pop2(params.cb_tag.as_bytes());
+    let umi_b = pop2(params.umi_tag.as_bytes());
+    let nb_b = pop2("nb".as_bytes());
 
-    // set counters
-    let mut total_count: usize = 0;
-    let mut err_count: usize = 0;
+    let mut total_count = 0;
+    let mut err_count = 0;
 
-    // make bam reader
-    let bam_reader = BamReader::from_path(bam_fn, calc_threads(&params)).unwrap();
-    
-    // make fastq writer;
-    let _file = match File::create(&fastq_path) {
-        Err(_why) => panic!("couldn't open {}", fastq_path.display()),
-        Ok(file) => file,
-    };
+    let bam_reader = BamReader::from_path(bam_fn, calc_threads(params))?;
     let f = File::create(&fastq_path)?;
-    let mut writer = GzBuilder::new()
-                            .filename(fastq_path.to_str().unwrap())
-                            .write(f, Compression::default());
+    let mut writer = GzBuilder::new().filename(fastq_path.to_str().unwrap()).write(f, Compression::default());
 
-    // read bam
-    for record in bam_reader{
-        let mut cb: String = Default::default();
-        let mut umi: String = Default::default();
-        total_count+=1;
+    for record in bam_reader {
+        total_count += 1;
         let rec = record.as_ref().unwrap();
 
-        // get name
         let old_readname = match str::from_utf8(rec.name()) {
-            Ok(value) => {
-                remove_whitespace(value)
-            },
-            Err(_e) => {
-                err_count+=1;
-                continue
+            Ok(value) => remove_whitespace(value),
+            Err(_) => {
+                err_count += 1;
+                continue;
             }
         };
 
-        // get cb and umi
-        match rec.tags().get(&cb_b) {
-            Some( bam::record::tags::TagValue::String(cba, _)) => {
-                cb = str::from_utf8(&cba).unwrap().to_string();
-                // eprintln!("{:?}", &cb);
-            },
+        let cb = match rec.tags().get(&cb_b) {
+            Some(TagValue::String(cba, _)) => str::from_utf8(cba).unwrap().to_string(),
             _ => {
-                err_count+=1;
-                continue
-            },
-        }
-        match rec.tags().get(&umi_b) {
-            Some( bam::record::tags::TagValue::String(uba, _)) => {
-                umi = str::from_utf8(&uba).unwrap().to_string();
-                // eprintln!("{:?}", &umi);
-            },
-            _ => {
-                err_count+=1;
-                continue
-            },
-        }
-        match rec.tags().get(&nb_b) {
-            Some( bam::record::tags::TagValue::Int(nba, _)) => {
-                nb_present = true;
-                nb = nba;
-            },
-            _ => {
-                nb_present = false;
-            },
-        }
-        if nb_present {
-            new_readname = format!("{}{}{}_{}_nb_{}",&old_readname, &split, cb, umi, nb);
-        } else {
-            new_readname = format!("{}{}{}_{}",&old_readname, &split, cb, umi );
-        }
-        
-        
-        // write to fastq.gz
-        let new_record: OwnedRecord = OwnedRecord{head: new_readname.as_bytes().to_vec(),
-                                    seq: rec.sequence().to_vec(),
-                                    sep: None,
-                                    qual: vec![255; rec.sequence().len()]};
+                err_count += 1;
+                continue;
+            }
+        };
 
-        let _nr = new_record.write(&mut writer);
+        let umi = match rec.tags().get(&umi_b) {
+            Some(TagValue::String(uba, _)) => str::from_utf8(uba).unwrap().to_string(),
+            _ => {
+                err_count += 1;
+                continue;
+            }
+        };
+
+        let nb_present = rec.tags().get(&nb_b).is_some();
+        let nb = if nb_present { rec.tags().get(&nb_b).unwrap().to_i32() } else { 0 };
+
+        let new_readname = if nb_present {
+            format!("{}{}{}_{}_nb_{}", old_readname, split, cb, umi, nb)
+        } else {
+            format!("{}{}{}_{}", old_readname, split, cb, umi)
+        };
+
+        let new_record = OwnedRecord {
+            head: new_readname.as_bytes().to_vec(),
+            seq: rec.sequence().to_vec(),
+            sep: None,
+            qual: vec![255; rec.sequence().len()],
+        };
+
+        new_record.write(&mut writer)?;
     }
-    info!("\t\t\tTotal reads processed: {}\tReads with errors: {}", total_count, err_count);
+
+    info!("Total reads processed: {}\tReads with errors: {}", total_count, err_count);
     if params.verbose {
-        eprintln!("\tTotal reads processed: {}\n\tReads with errors: {}\n", total_count, err_count);
+        eprintln!("Total reads processed: {}\nReads with errors: {}", total_count, err_count);
     }
+
     Ok(())
 }
 
+pub fn align(run: &Run) -> Result<(), Box<dyn Error>> {
+    if !run.level.mini_fasta.exists() {
+        error!("Alignment fasta not found at: {}", run.level.mini_fasta.to_str().unwrap());
+        panic!("Alignment fasta not found at: {}", run.level.mini_fasta.to_str().unwrap());
+    }
 
-pub fn align (run: &Run)-> Result<(), Box<dyn Error>> {
-    let align_fasta_path = &run.level.mini_fasta;
-    let align_fasta = align_fasta_path.to_str().unwrap();
-    if !align_fasta_path.exists() {
-        error!("\t\tAlignment fasta not found at: {}", align_fasta);
-        panic!("Alignment fasta not found at: {}", align_fasta);
-    }
     let fastq_path = run.params.output_path.join("fastq.fq.gz");
-    let fastq_file = fastq_path.to_str().unwrap();
     if !fastq_path.exists() {
-        error!("\t\tAlignment fastq not found at: {}", fastq_file);
-        panic!("Alignment fastq not found at: {}", fastq_file);
+        error!("Alignment fastq not found at: {}", fastq_path.to_str().unwrap());
+        panic!("Alignment fastq not found at: {}", fastq_path.to_str().unwrap());
     }
-    let sam_path = &run.level.out_unsorted_sam;
-    let sam_file = sam_path.to_str().unwrap();
-    info!("\t\t{}", "Aligning reads using minimap2 - Output below:");
+
+    info!("Aligning reads using minimap2:");
     if run.params.verbose {
-        eprintln!("{}", "Aligning reads using minimap2 - Output below:\n");
+        eprintln!("Aligning reads using minimap2:");
     }
+
     let output = Command::new("minimap2")
-                    .arg("--cs=long")
-                    .arg("--secondary=no")
-                    .arg("-x")
-                    .arg("map-hifi")
-                    .arg("-Q")  // TODO: this ignores base qual.  fix this later
-                    .arg("--MD")
-                    .arg("-a")
-                    .arg("-t")
-                    .arg(run.params.threads.to_string())
-                    .arg(align_fasta)
-                    .arg(fastq_file)
-                    .arg("-o")
-                    .arg(sam_file)
-                    .stderr(Stdio::piped())
-                    .stdout(Stdio::piped())
-                     .output()
-                     .expect("\n\n*******Failed to execute minimap2*******\n\n");
+        .arg("--cs=long")
+        .arg("--secondary=no")
+        .arg("-x")
+        .arg("map-hifi")
+        .arg("-Q")
+        .arg("--MD")
+        .arg("-a")
+        .arg("-t")
+        .arg(run.params.threads.to_string())
+        .arg(run.level.mini_fasta.to_str().unwrap())
+        .arg(fastq_path.to_str().unwrap())
+        .arg("-o")
+        .arg(run.level.out_unsorted_sam.to_str().unwrap())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Failed to execute minimap2");
+
     info!("{}", String::from_utf8_lossy(&output.stderr));
     if run.params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
+
     Ok(())
 }
 
+pub fn sort(run: &Run) -> Result<(), Box<dyn Error>> {
+    if !run.level.out_unsorted_sam.exists() {
+        error!("SAM not found at: {}", run.level.out_unsorted_sam.to_str().unwrap());
+        panic!("SAM not found at: {}", run.level.out_unsorted_sam.to_str().unwrap());
+    }
 
+    info!("Minimap2 complete; Running samtools sort");
+    if run.params.verbose {
+        eprintln!("Minimap2 complete; Running samtools sort");
+    }
 
-pub fn sort (run: &Run)-> Result<(), Box<dyn Error>> {
-    let sam_path = &run.level.out_unsorted_sam;
-    let sam_file = sam_path.to_str().unwrap();
-    if !sam_path.exists() {
-        error!("\t\tSAM not found at: {}", sam_file);
-        panic!("SAM not found at: {}", sam_file);
-    }
-    let ssam_path = &run.level.out_sorted_sam;
-    let ssam_file = ssam_path.to_str().unwrap();
-    let bam_path = &run.level.out_sorted_bam;
-    let bam_file = bam_path.to_str().unwrap();
-    info!("\t\t{}", "Minimap2 complete; Running samtools sort");
-    if run.params.verbose {
-        eprintln!("{}", "Minimap2 complete; Running samtools sort");
-    }
     let output = Command::new("samtools")
-                    .arg("sort")
-                    .arg("-@")
-                    .arg(run.params.threads.to_string())
-                    .arg("-o")
-                    .arg(ssam_file)
-                    .arg(sam_file)
-                    .stderr(Stdio::piped())
-                    .stdout(Stdio::piped())
-                    .output()
-                     .expect("\n\n*******Failed to execute samtools view*******\n\n");
-    info!("\t\t{}", String::from_utf8_lossy(&output.stderr));
-    if run.params.verbose {
-        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-        
-    }
-    info!("\t\t{}", "Samtools sort complete; Running samtools view");
-    if run.params.verbose {
-        eprintln!("{}", "Samtools sort complete; Running samtools view");
-    }
-    
-    if !ssam_path.exists() {
-        error!("\t\tSorted SAM not found at: {}", ssam_file);
-        panic!("Sorted SAM not found at: {}", ssam_file);
-    }
-    let output = Command::new("samtools")
-                    .arg("view")
-                    .arg("-b")
-                    .arg("-@")
-                    .arg(run.params.threads.to_string())
-                    .arg("-o")
-                    .arg(bam_file)
-                    .arg(ssam_file)
-                    .stderr(Stdio::piped())
-                    .stdout(Stdio::piped())
-                    .output()
-                     .expect("\n\n*******Failed to execute samtools sort*******\n\n");
-    info!("\t\t{}", String::from_utf8_lossy(&output.stderr));
+        .arg("sort")
+        .arg("-@")
+        .arg(run.params.threads.to_string())
+        .arg("-o")
+        .arg(run.level.out_sorted_sam.to_str().unwrap())
+        .arg(run.level.out_unsorted_sam.to_str().unwrap())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Failed to execute samtools sort");
+
+    info!("{}", String::from_utf8_lossy(&output.stderr));
     if run.params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
-    info!("\t\t{}", "Samtools view complete; Running samtools index");
+
+    info!("Samtools sort complete; Running samtools view");
     if run.params.verbose {
-        eprintln!("{}", "Samtools view complete; Running samtools index");
+        eprintln!("Samtools sort complete; Running samtools view");
     }
-    if !bam_path.exists() {
-        error!("Sorted SAM not found at: {}", bam_file);
-        panic!("\t\tSorted SAM not found at: {}", bam_file);
+
+    if !run.level.out_sorted_sam.exists() {
+        error!("Sorted SAM not found at: {}", run.level.out_sorted_sam.to_str().unwrap());
+        panic!("Sorted SAM not found at: {}", run.level.out_sorted_sam.to_str().unwrap());
     }
+
     let output = Command::new("samtools")
-                    .arg("index")
-                    .arg("-@")
-                    .arg(run.params.threads.to_string())
-                    .arg(bam_file)
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .output()
-                     .expect("\n\n*******Failed to execute samtools index*******\n\n");
+        .arg("view")
+        .arg("-b")
+        .arg("-@")
+        .arg(run.params.threads.to_string())
+        .arg("-o")
+        .arg(run.level.out_sorted_bam.to_str().unwrap())
+        .arg(run.level.out_sorted_sam.to_str().unwrap())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Failed to execute samtools view");
+
+    info!("{}", String::from_utf8_lossy(&output.stderr));
     if run.params.verbose {
         eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     }
+
+    info!("Samtools view complete; Running samtools index");
+    if run.params.verbose {
+        eprintln!("Samtools view complete; Running samtools index");
+    }
+
+    if !run.level.out_sorted_bam.exists() {
+        error!("Sorted SAM not found at: {}", run.level.out_sorted_bam.to_str().unwrap());
+        panic!("Sorted SAM not found at: {}", run.level.out_sorted_bam.to_str().unwrap());
+    }
+
+    let output = Command::new("samtools")
+        .arg("index")
+        .arg("-@")
+        .arg(run.params.threads.to_string())
+        .arg(run.level.out_sorted_bam.to_str().unwrap())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .output()
+        .expect("Failed to execute samtools index");
+
+    info!("{}", String::from_utf8_lossy(&output.stderr));
+    if run.params.verbose {
+        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+    }
+
     Ok(())
 }
 
-pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
-    info!("\t\tCounting reads:");
+pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>) {
+    info!("Counting reads:");
     if run.params.verbose {
         eprintln!("Counting reads:");
     }
-    // declare some stuff
+
     let split = "|BARCODE=".to_string();
-    let bam_path = &run.level.out_sorted_bam;
-    let bam_file = bam_path.to_str().unwrap();
-    let mut total_count: usize = 0;
-    let mut err_count: usize = 0;
-    let mut unmapped_count: usize = 0;
-    let mut mapped_count: usize = 0;
+    let bam_reader = BamReader::from_path(&run.level.out_sorted_bam, calc_threads(&run.params)).unwrap();
+    let seqnames: Vec<String> = bam_reader
+        .header()
+        .reference_names()
+        .iter()
+        .map(|seq| seq.replace("|", &run.params.hla_sep))
+        .collect();
+
+    let mut total_count = 0;
+    let mut err_count = 0;
+    let mut unmapped_count = 0;
+    let mut mapped_count = 0;
     let mut bc_perfect_count = 0;
     let mut bc_imperfect_count = 0;
     let mut bc_notfound_count = 0;
 
-    // bam reader and get seqnames
-    let bam_reader = bam::BamReader::from_path(bam_file, calc_threads(&run.params)).unwrap();
-    let mut seqnames = Vec::new();
-    let mut _result = "";
-    let header = bam_reader.header().clone();
-    let hdata = header.reference_names();
-    for seq in hdata {
-        let seq_fixed = seq.replace("|", &run.params.hla_sep);
-        seqnames.push(seq_fixed)
-    }
-
-    // count
     let mut data = Vec::new();
-    let mut molecule_data: Vec<String> = Vec::new();
-    for record in bam_reader{
-        total_count+=1;
-        let readname = match str::from_utf8(record.as_ref().unwrap().name()) {
-            Ok(v) => v,
-            Err(_e) => {
-                err_count+=1;
-                continue
-            },
+    let mut molecule_data = Vec::new();
+
+    for record in bam_reader {
+        total_count += 1;
+        let rec = match record.as_ref() {
+            Ok(rec) => rec,
+            Err(_) => {
+                err_count += 1;
+                continue;
+            }
         };
-        let mut cbumi = if readname.split(&split).nth(1).is_some()
-            {
-                readname.split(&split).nth(1).unwrap().to_string()
-            } else {
-                "not_found";
-                continue
-            };
-        
+
+        let readname = match str::from_utf8(rec.name()) {
+            Ok(v) => v,
+            Err(_) => {
+                err_count += 1;
+                continue;
+            }
+        };
+
+        let mut cbumi = readname.split(&split).nth(1).unwrap_or_default().to_string();
         let mut nb_present = false;
-        let mut nb: i32 = 0;
-        // eprintln!("{}", &cbumi);
+        let mut nb = 0;
+
         if cbumi.contains("_nb_") {
             nb_present = true;
             nb = cbumi.split("_nb_").nth(1).unwrap().parse::<i32>().unwrap();
-            // nb = from_str::<i32>(cbumi.split("_nb_").nth(1).unwrap()).unwrap();
-            cbumi  = cbumi.split("_nb_").nth(0).unwrap().to_string();
+            cbumi = cbumi.split("_nb_").nth(0).unwrap().to_string();
         }
+
         let cb = cbumi.split("_").nth(0);
         let umi = cbumi.split("_").nth(1);
-        if record.as_ref().unwrap().ref_id() < 0 {
-                unmapped_count+=1;
-                continue;
-        } else if record.as_ref().unwrap().ref_id() > seqnames.len().try_into().unwrap() {
-                err_count+=1;
-                continue;
+
+        if rec.ref_id() < 0 {
+            unmapped_count += 1;
+            continue;
+        } else if rec.ref_id() as usize >= seqnames.len() {
+            err_count += 1;
+            continue;
         } else {
-                mapped_count+=1;
-                let rec = record.as_ref().unwrap();
-                let index = rec.ref_id() as usize;
-                let name = rec.name();
-                // eprintln!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]);
-                data.push(format!("{} {} {}", &cb.unwrap(), &umi.unwrap(), seqnames[index]));
-                if cb.is_none(){
-                    err_count+=1;
-                    warn!("CB tag not returned correctly for read {:?}", str::from_utf8(rec.name()).unwrap());
-                    continue
-                }
-                if cb.is_none(){
-                    err_count+=1;
-                    warn!("CB tag not returned correctly for read {:?}", str::from_utf8(rec.name()).unwrap());
-                    continue
-                }
-                let nm_tag = match rec.tags().get(b"NM") {
-                    Some(TagValue::Int(value, _)) => value,
-                    _ => {
-                            warn!("NM tag not returned correctly for read {:?}", str::from_utf8(rec.name()).unwrap());
-                            -1
-                        },
-                    };
-                let as_tag = match rec.tags().get(b"AS") {
-                    Some(TagValue::Int(value, _)) => value,
-                    _ => {
-                            warn!("AS tag not returned correctly for read {:?}", rec.name());
-                            0
-                        },
-                };
-                let s1_tag = match rec.tags().get(b"s1") {
-                    Some(TagValue::Int(value, _)) => value,
-                    _ => {
-                            warn!("s1 tag not returned correctly for read {:?}", rec.name());
-                            0
-                        },
-                };
-                let de_tag = match rec.tags().get(b"de") {
-                    Some(TagValue::Float(value)) => value,
-                    _ => {
-                            warn!("de tag not returned correctly for read {:?}", rec.name());
-                            0.0
-                        },
-                };
+            mapped_count += 1;
+            let index = rec.ref_id() as usize;
+            data.push(format!("{} {} {}", cb.unwrap_or_default(), umi.unwrap_or_default(), seqnames[index]));
 
-                let _de_tag = match rec.tags().get(b"nb") {
-                    Some(TagValue::Int(value, _)) =>  value,  
-                    _ => {  
-                            // let e = rec.tags().get(b"nb");
-                            // eprintln!("{:?}", e);
-                            warn!("nb tag not returned correctly for read {:?}", rec.name());
-                            -1
-                        },
-                };
-
-                if nb_present {
-                    if nb == 0 {
-                        bc_perfect_count+=1
-                    } else {
-                        if nb < 0 {
-                            bc_notfound_count+=1
-                        }
-                        if nb > 0 {
-                            bc_imperfect_count+=1
-                        }
-                    }
-                    // columns cb, nb, umi, seqname, query_len, start, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence), seq (optional)
-                    if run.params.return_sequence {
-                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), nb, &umi.unwrap(), seqnames[index], rec.query_len(), rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag, String::from_utf8_lossy(&rec.sequence().to_vec())));
-                    } else {
-                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), nb, &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
-                    }
-                } else{
-                    // columns cb, umi, seqname, query_len, start, mapq, cigar, NM, AS, chaining_score, de (per base sequence divergence), seq (optional)
-                    if run.params.return_sequence {
-                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.query_len(), rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag, String::from_utf8_lossy(&rec.sequence().to_vec())));
-                    } else {
-                        molecule_data.push(format!("{} {} {} {} {} {} {} {} {} {} {}\n", String::from_utf8_lossy(name), &cb.unwrap(), &umi.unwrap(), seqnames[index], rec.start(), rec.mapq(), rec.cigar(), nm_tag, as_tag, s1_tag, de_tag));
-                    }
+            if nb_present {
+                if nb == 0 {
+                    bc_perfect_count += 1;
+                } else if nb < 0 {
+                    bc_notfound_count += 1;
+                } else {
+                    bc_imperfect_count += 1;
                 }
-                
-                
+                molecule_data.push(format_molecule_data(
+                    rec, &cb.unwrap_or_default(), nb, &umi.unwrap_or_default(), &seqnames[index], run.params.return_sequence,
+                ));
+            } else {
+                molecule_data.push(format_molecule_data(
+                    rec, &cb.unwrap_or_default(), 0, &umi.unwrap_or_default(), &seqnames[index], run.params.return_sequence,
+                ));
+            }
         }
     }
-    info!("\t\t\tTotal reads processed: {}\tReads with errors: {}", total_count, err_count);
-    info!("\t\t\tUnmapped reads: {}\tMapped reads: {}", unmapped_count, mapped_count);
+
+    info!("Total reads processed: {}\tReads with errors: {}", total_count, err_count);
+    info!("Unmapped reads: {}\tMapped reads: {}", unmapped_count, mapped_count);
+
     if bc_perfect_count + bc_notfound_count + bc_imperfect_count > 0 {
-        info!("\tPerfect Barcodes: {}\n\tCorrected Barcodes: {}\n\tUnmatchable Barcodes: {}\n", bc_perfect_count, bc_imperfect_count, bc_notfound_count);
+        info!(
+            "Perfect Barcodes: {}\nCorrected Barcodes: {}\nUnmatchable Barcodes: {}\n",
+            bc_perfect_count, bc_imperfect_count, bc_notfound_count
+        );
     }
+
     if run.params.verbose {
-        eprintln!("\tTotal reads processed: {}\n\tReads with errors: {}\n\tUnmapped reads: {}\n\tMapped reads: {}\n", total_count, err_count, unmapped_count, mapped_count);
+        eprintln!(
+            "Total reads processed: {}\nReads with errors: {}\nUnmapped reads: {}\nMapped reads: {}\n",
+            total_count, err_count, unmapped_count, mapped_count
+        );
         if bc_perfect_count + bc_notfound_count + bc_imperfect_count > 0 {
-            eprintln!("\tPerfect Barcodes: {}\n\tCorrected Barcodes: {}\n\tUnmatchable Barcodes: {}\n", bc_perfect_count, bc_imperfect_count, bc_notfound_count);
+            eprintln!(
+                "Perfect Barcodes: {}\nCorrected Barcodes: {}\nUnmatchable Barcodes: {}\n",
+                bc_perfect_count, bc_imperfect_count, bc_notfound_count
+            );
         }
     }
-    data.sort();
-    let mut out_vec = Vec::new();
-    let cdata = data.into_iter().dedup_with_count();
-    for (count, record) in cdata {
-       let count_str = record+&" ".to_owned()+&(count.to_string()+&"\n".to_owned());
-        out_vec.push(count_str.as_bytes().to_owned());
-    }
+
+    let count_vec = data.into_iter().dedup_with_count()
+        .map(|(count, record)| format!("{} {}\n", record, count).into_bytes())
+        .collect();
+
     molecule_data.sort();
 
-    return (out_vec, molecule_data);
+    (count_vec, molecule_data)
 }
 
-pub fn write_counts (count_vec: Vec<Vec<u8>>, run: &Run) -> Result<(), Box<dyn Error>> {
-        let counts_path = &run.level.counts;
-        let counts_file = counts_path.to_str().unwrap();
-        info!("\t\tWriting counts to : '{}'", counts_file);
-        if run.params.verbose{
-            eprintln!("Writing counts to : '{}'\n", counts_file);
-        }
-        let f = File::create(counts_file)?;
-        let mut gz = GzBuilder::new()
-                        .filename(counts_file)
-                        .write(f, Compression::default());
-        for result in count_vec {
-                gz.write_all(&result)?;
-        }
-        gz.finish()?;
-        Ok(())
-}
+fn format_molecule_data(
+    rec: &bam::Record, cb: &str, nb: i32, umi: &str, seqname: &str, return_sequence: bool,
+) -> String {
+    let nm_tag = rec.tags().get(b"NM").and_then(TagValue::to_i32).unwrap_or(-1);
+    let as_tag = rec.tags().get(b"AS").and_then(TagValue::to_i32).unwrap_or(0);
+    let s1_tag = rec.tags().get(b"s1").and_then(TagValue::to_i32).unwrap_or(0);
+    let de_tag = rec.tags().get(b"de").and_then(TagValue::to_f32).unwrap_or(0.0);
 
-pub fn write_molecules (molecule_vec: Vec<String>, run: &Run) -> Result<(), Box<dyn Error>> {
-        let molecule_path = &run.level.molecule;
-        let molecule_file = molecule_path.to_str().unwrap();
-        info!("\t\tWriting molecule info to : '{}'", molecule_file);
-        if run.params.verbose{
-            eprintln!("Writing molecule info to : '{}'\n", molecule_file);
-        }
-        let f = File::create(molecule_file)?;
-        let mut gz = GzBuilder::new()
-                        .filename(molecule_file)
-                        .write(f, Compression::default());
-        for result in molecule_vec {
-                gz.write_all(&result.as_bytes())?;
-        }
-        gz.finish()?;
-        Ok(())
-}
-
-
-
-pub fn cleanup(filename: &Path, warn: bool) -> std::io::Result<()> {
-    if Path::new(filename).exists(){
-        fs::remove_file(filename.to_str().unwrap())?;
-        Ok(())
-    }else {
-        if warn{
-            warn!("\t\tFile does not exist: '{:?}'", filename);
-        }
-        Ok(())
+    if return_sequence {
+        format!(
+            "{} {} {} {} {} {} {} {} {} {} {} {} {} {}\n",
+            str::from_utf8(rec.name()).unwrap_or_default(),
+            cb,
+            nb,
+            umi,
+            seqname,
+            rec.query_len(),
+            rec.start(),
+            rec.mapq(),
+            rec.cigar(),
+            nm_tag,
+            as_tag,
+            s1_tag,
+            de_tag,
+            str::from_utf8(&rec.sequence()).unwrap_or_default()
+        )
+    } else {
+        format!(
+            "{} {} {} {} {} {} {} {} {} {} {} {}\n",
+            str::from_utf8(rec.name()).unwrap_or_default(),
+            cb,
+            nb,
+            umi,
+            seqname,
+            rec.query_len(),
+            rec.start(),
+            rec.mapq(),
+            rec.cigar(),
+            nm_tag,
+            as_tag,
+            s1_tag,
+            de_tag
+        )
     }
 }
 
+pub fn write_counts(count_vec: Vec<Vec<u8>>, run: &Run) -> Result<(), Box<dyn Error>> {
+    info!("Writing counts to : '{}'", run.level.counts.to_str().unwrap());
 
+    let f = File::create(&run.level.counts)?;
+    let mut gz = GzBuilder::new().filename(run.level.counts.to_str().unwrap()).write(f, Compression::default());
+
+    for result in count_vec {
+        gz.write_all(&result)?;
+    }
+
+    gz.finish()?;
+    Ok(())
+}
+
+pub fn write_molecules(molecule_vec: Vec<String>, run: &Run) -> Result<(), Box<dyn Error>> {
+    info!("Writing molecule info to : '{}'", run.level.molecule.to_str().unwrap());
+
+    let f = File::create(&run.level.molecule)?;
+    let mut gz = GzBuilder::new().filename(run.level.molecule.to_str().unwrap()).write(f, Compression::default());
+
+    for result in molecule_vec {
+        gz.write_all(result.as_bytes())?;
+    }
+
+    gz.finish()?;
+    Ok(())
+}
+
+pub fn cleanup(filename: &Path, warn: bool) -> std::io::Result<()> {
+    if filename.exists() {
+        fs::remove_file(filename)?;
+    } else if warn {
+        warn!("File does not exist: '{:?}'", filename);
+    }
+    Ok(())
+}
 
 fn pop2(barry: &[u8]) -> &[u8; 2] {
     array_ref!(barry, 0, 2)
 }
 
-
-
-fn remove_whitespace( s: &str) ->  String{
-    s.to_string().retain(|c| !c.is_whitespace());
-    return s.to_string()
+fn remove_whitespace(s: &str) -> String {
+    s.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
 fn get_current_working_dir() -> std::io::Result<PathBuf> {
     env::current_dir()
 }
-
