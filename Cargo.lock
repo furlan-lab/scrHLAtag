@@ -702,6 +702,7 @@ dependencies = [
  "serde_derive",
  "simple-log",
  "toml",
+ "yaml-rust 0.4.5",
 ]
 
 [[package]]
