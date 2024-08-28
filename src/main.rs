@@ -8,7 +8,7 @@ use simple_log::LogConfigBuilder;
 use simple_log::info;
 // use std::path::Path;
 
-
+pub mod vc;
 pub mod scrhlatag;
 use crate::scrhlatag::*;
 fn main() {
