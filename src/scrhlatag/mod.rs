@@ -518,7 +518,7 @@ pub fn align (run: &Run)-> Result<(), Box<dyn Error>> {
                     .arg("--secondary=no")
                     .arg("-x")
                     .arg("map-hifi")
-                    .arg("-Q")  // TODO: this ignores base qual.  fix this later
+                    // .arg("-Q")  // TODO: this ignores base qual.  fix this later
                     .arg("--MD")
                     .arg("-a")
                     .arg("-t")
