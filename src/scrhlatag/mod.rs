@@ -35,7 +35,7 @@ extern crate fastq;
 extern crate kseq;
 
 
-use std::{env, io::Write, str, fs, fs::File, error::Error, path::{Path, PathBuf}, collections::HashMap, process::{Command, Stdio }};
+use std::{collections::HashMap, env, error::Error, fs::{self, File}, io::Write, path::{Path, PathBuf}, process::{Command, Stdio }, str, vec};
 use std::io::{ BufReader, BufWriter};
 use clap::{App, load_yaml};
 use serde::Deserialize;
@@ -470,12 +470,19 @@ pub fn make_fastq (params: &InputParams)-> Result<(), Box<dyn Error>> {
             new_readname = format!("{}{}{}_{}",&old_readname, &split, cb, umi );
         }
         
-        
+        let mut qual = vec![0; rec.qualities().len()];
+        if rec.qualities().available(){
+            qual = rec.qualities().to_readable();
+        } else {
+            err_count+=1;
+            eprintln!("No quality scores found for read {:?}", str::from_utf8(rec.name()).unwrap());
+            continue
+        }
         // write to fastq.gz
         let new_record: OwnedRecord = OwnedRecord{head: new_readname.as_bytes().to_vec(),
                                     seq: rec.sequence().to_vec(),
                                     sep: None,
-                                    qual: vec![255; rec.sequence().len()]};
+                                    qual: qual};
 
         let _nr = new_record.write(&mut writer);
     }
