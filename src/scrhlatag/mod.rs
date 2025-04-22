@@ -730,15 +730,14 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                         },
                 };
 
-                let _de_tag = match rec.tags().get(b"nb") {
-                    Some(TagValue::Int(value, _)) =>  value,  
-                    _ => {  
-                            // let e = rec.tags().get(b"nb");
-                            // eprintln!("{:?}", e);
-                            warn!("nb tag not returned correctly for read {:?}", rec.name());
-                            -1
-                        },
-                };
+                // let _de_tag = match rec.tags().get(b"nb") {
+                //     Some(TagValue::Int(value, _)) =>  value,  
+                //     _ => {  
+                //             // let e = rec.tags().get(b"nb");
+                //             warn!("nb tag not returned correctly for read {}", std::str::from_utf8(rec.name()).unwrap());
+                //             -1
+                //         },
+                // };
 
                 if nb_present {
                     if nb == 0 {

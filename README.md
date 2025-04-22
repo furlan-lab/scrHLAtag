@@ -21,7 +21,7 @@ To install scrHLAtag:
 5. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
 ### Updates
-**version 0.1.6** - 4/21/25 - added qual string to fastq
+**version 0.1.6** - 4/21/25 - added qual string to fastq; fixed a bug that searched for nb tags in the aligned bam and printed long logfiles when it found none.  This had previously been fixed by writing nb in the readname.
 
 **version 0.1.5** - 6/15/23 - added more checking for all components of a count before writing (i.e. will skip a read if cb, umi, or name is not present)
 

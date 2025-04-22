@@ -77,7 +77,7 @@ ml SAMtools
 
 sbatch -n 1 -c 30 -p campus-new -M gizmo --mem-per-cpu=21000MB --wrap='../scrHLAtag -v -b AML8/AML8_34.corrected.bam -a aml8_alleles.tsv -o aml8 -l transcriptome -s -t 30'
 
-../scrHLAtag -v -b AML8_34.corrected.bam -a aml8_alleles.tsv -o aml8 -l transcriptome -s -t 16
+../scrHLAtag -v -b AML8/AML8_34.corrected.bam -a aml8_alleles.tsv -o aml8 -l transcriptome -s -t 16
 ```
 
 ```R
