@@ -127,6 +127,7 @@ mkdir -p "${OUTPUT_DIR}/intermediate_results_dir"
 export TMPDIR="${OUTPUT_DIR}/tmp_dir"
 mkdir -p "${TMPDIR}"
 
+samtools faidx $REF_FASTA
 export IBAM="Aligned_mm2_sorted_mRNA.bam"
 
 sbatch -n 1 -c ${THREADS} --gpus=1 -p campus-new --mem-per-cpu=8GB --wrap='
