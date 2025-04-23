@@ -188,6 +188,19 @@ sbatch -n 1 -c ${THREADS} --gpus=1 -p campus-new --mem-per-cpu=8GB --wrap='
 ```
 
 
+```sh
+cd AML8
+../../addback -b Aligned_mm2_sorted_mRNA.bam
 
+cat > variants.csv << EOL
+seq,start,ref_nt,query_nt,name
+A|11:01:01,1010,C,AGGTGGAGAAGGGGTGAA,HLA_indel1
+A|11:01:01,1011,A,GTGGAGAAGGGGTGAA,HLA_indel2
+EOL
+sed -E 's/("([^"]*)")?,/\2\t/g' variants.csv > variants.tsv
+cat variants.tsv
 
+~/develop/mutCaller/mutcaller ALIGNED --help
+~/develop/mutCaller/mutcaller ALIGNED -b Aligned_mm2_sorted_mRNA.bam -s variants.tsv
+```
 

@@ -48,6 +48,7 @@ use itertools::Itertools;
 use kseq::parse_path;
 use simple_log::LogConfigBuilder;
 use simple_log::{info, warn, error};
+use arrayref::array_ref;
 // use toml::from_str;
 
 
@@ -849,7 +850,7 @@ fn pop2(barry: &[u8]) -> &[u8; 2] {
 
 
 
-fn remove_whitespace( s: &str) ->  String{
+pub fn remove_whitespace( s: &str) ->  String{
     s.to_string().retain(|c| !c.is_whitespace());
     return s.to_string()
 }
@@ -857,4 +858,3 @@ fn remove_whitespace( s: &str) ->  String{
 fn get_current_working_dir() -> std::io::Result<PathBuf> {
     env::current_dir()
 }
-
