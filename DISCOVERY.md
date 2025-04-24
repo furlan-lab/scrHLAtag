@@ -5,7 +5,7 @@
 sFH2
 cd ~/develop/scrHLAtag/data
 cp /fh/fast/furlan_s/user/skanaan/scrHLAtyping/Manuscript/2nd_Draft/geo_upload/scrHLAtyping/AML8_34_hifi_reads.bam .
-
+cp /fh/fast/furlan_s/user/skanaan/scrHLAtyping/Manuscript/2nd_Draft/geo_upload/scrHLAtyping/AML8_BM_hifi_reads.bam .
 MM
 micromamba activate isoseq4
 export ref_dir=/fh/fast/furlan_s/grp/refs/long_read_refs/pacbio
@@ -17,10 +17,11 @@ export pA=$ref_dir/polyA.list
 export cage=$ref_dir/refTSS_v3.1_human_coordinate.hg38.bed
 export threads=30
 export BAM=AML8_34_hifi_reads.bam
+export BAM=AML8_BM_hifi_reads.bam
 ls -asl $BAM
 export bam=$BAM
 export out_subdir=AML8
-export prefix=$out_subdir/AML8_34
+export prefix=$out_subdir/AML8_BM
 echo $prefix
 mkdir -p $out_subdir
 sbatch -n 1 -c 30 -p campus-new -M gizmo --mem-per-cpu=21000MB --wrap='lima \
@@ -117,7 +118,9 @@ cargo build --release && cp ../target/release/scrHLAtag ..
 
 sbatch -n 1 -c 30 -p campus-new -M gizmo --mem-per-cpu=21000MB --wrap='../scrHLAtag -v -b AML8/AML8_34.corrected.bam -a aml8_alleles.tsv -o AML8 -l transcriptome -s -t 30'
 
-../scrHLAtag -v -b AML8/AML8_34.corrected.bam -a aml8_alleles.tsv -o AML8 -l transcriptome -s -t 16
+../scrHLAtag -v -b AML8_34.corrected.bam -a aml8_alleles.tsv -o AML8_34 -l transcriptome -s -t 16
+
+../scrHLAtag -v -b AML8_BM.corrected.bam -a aml8_alleles.tsv -o AML8_BM -l transcriptome -s -t 16
 ```
 
 ```R
@@ -189,18 +192,23 @@ sbatch -n 1 -c ${THREADS} --gpus=1 -p campus-new --mem-per-cpu=8GB --wrap='
 
 
 ```sh
-cd AML8
+cd AML8_34
 ../../addback -b Aligned_mm2_sorted_mRNA.bam
+samtools index out.bam
+
+cd ../AML8_BM
+../../addback -b Aligned_mm2_sorted_mRNA.bam
+samtools index out.bam
 
 cat > variants.csv << EOL
 seq,start,ref_nt,query_nt,name
-A|11:01:01,1010,C,AGGTGGAGAAGGGGTGAA,HLA_indel1
-A|11:01:01,1011,A,GTGGAGAAGGGGTGAA,HLA_indel2
+A|11:01:01,1011,A,AGGTGGAGAAGGGGTGAA,HLA_indel1
+A|11:01:01,1013,A,GTGGAGAAGGGGTGAA,HLA_indel2
 EOL
 sed -E 's/("([^"]*)")?,/\2\t/g' variants.csv > variants.tsv
 cat variants.tsv
 
 ~/develop/mutCaller/mutcaller ALIGNED --help
-~/develop/mutCaller/mutcaller ALIGNED -b Aligned_mm2_sorted_mRNA.bam -s variants.tsv
+~/develop/mutCaller/mutcaller ALIGNED -b out.bam -s variants.tsv
 ```
 

@@ -61,7 +61,7 @@ pub fn addback_bam(bam: String, out: String) {
                 let umi = data_vec[1].to_string();
                 let nb = data_vec[3].parse::<i32>().unwrap_or(0);
                 record.tags_mut().push_string(b"CB", cb.as_bytes());
-                record.tags_mut().push_string(b"UB", umi.as_bytes());
+                record.tags_mut().push_string(b"XM", umi.as_bytes());
                 record.tags_mut().push_num(b"nb", nb);
 
             },
