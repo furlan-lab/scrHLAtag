@@ -1,0 +1,15 @@
+---
+title: "HLA Mutations"
+author: "SNF"
+date: "4-23-25"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+graphics.off()
+rm(list=ls())
+
+
+```

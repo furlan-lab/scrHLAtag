@@ -1,0 +1,17 @@
+name: addback
+version: "0.1.6"
+author: 'copyright Scott Furlan'
+about: 'addback is a command line tool for adding back the CB and UMI tag to the original bam file'
+args:
+    - bam:
+        long: bam
+        short: b
+        takes_value: true
+        required: true
+        help: input bam
+    - verbose:
+        long: verbose
+        short: v
+        help: verbose
+        takes_value: false
+        required: false
