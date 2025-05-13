@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-<p align="center"><img src="img/Artboard1.png" alt="" width="400"></a></p>
-=======
 <p align="center"><img src="scrHLAtag.png" alt="" width="400"></a></p>
->>>>>>> dbac30bd3afc2d5e94ecc78a8868d36c783d2b48
+
 
 
 #                       scrHLAtag
@@ -25,11 +22,7 @@ To install scrHLAtag:
 5. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
 ### Updates
-<<<<<<< HEAD
-**version 0.1.7** - 5/13/25 - IMGT/HLA is nowv version 3.60.0 - 2025-04; updated reference fasta to include a few 4field alleles that differ at the mRNA level despite nomenclature.
-=======
-**version 0.1.7** - 5/13/25 - IMGT/HLA is now version 3.60.0 - 2025-04; updated reference fastas to include 4-field alleles that differ at the mRNA level despite nomenclature
->>>>>>> dbac30bd3afc2d5e94ecc78a8868d36c783d2b48
+**version 0.1.7** - 5/13/25 - IMGT/HLA is now version 3.60.0 - 2025-04; updated reference fasta to include a few 4field alleles that differ at the mRNA level despite nomenclature.
 
 **version 0.1.6** - 4/21/25 - added qual string to fastq; fixed a bug that searched for nb tags in the aligned bam and printed long logfiles when it found none.  This had previously been fixed by writing nb in the readname.
 
@@ -64,11 +57,7 @@ DRB3*01:62:01
 DQB1*04:02:01
 ```
 **Important Notes:**
-<<<<<<< HEAD
-1. Because scrHLAtag is designed for use with single cell RNA data, ***only up to 3-field HLA nomenclature should be used***.  HLA alleles which only vary in the 4th field from each other (i.e. A\*30:02:01:01, A\*30:02:01:02, A\*30:02:01:03, etc) have been removed from the reference and only the \*:\*:\*:01 allele was retained in the reference.  Code showing how this was accomplished, can be found in `scripts/generation_refs.sh`.  See https://hla.alleles.org/nomenclature/naming.html for more details about HLA nomenclature.
-=======
 1. Because scrHLAtag is designed for use with single cell RNA data, ***only up to 3-field HLA nomenclature should be used***.  HLA alleles which only vary in the 4th field from each other (i.e. A\*30:02:01:01, A\*30:02:01:02, A\*30:02:01:03, etc) have been removed from the reference and only the \*:\*:\*:01 allele was retained in the reference.  Code showing how this was accomplished, can be found in `scripts/generation_refs.sh`.  See https://hla.alleles.org/pages/nomenclature/naming_alleles/ for more details about HLA nomenclature.
->>>>>>> dbac30bd3afc2d5e94ecc78a8868d36c783d2b48
 2. The HLA reference file (from Nolan registry) is included in this program and does not need to be supplied during invocation.  *Current version: 3.60.0 - 2025-04*
 3. Because the `*` character is not fasta friendly, the `|` character is used in our fasta reference files as a separator.  The alleles_file should still contain \*, however.
 
