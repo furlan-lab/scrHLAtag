@@ -1,4 +1,4 @@
-<p align="center"><img src="scrHLAtag.png" alt="" width="400"></a></p>
+<p align="center"><img src="img/Artboard1.png" alt="" width="400"></a></p>
 
 
 #                       scrHLAtag
@@ -21,7 +21,7 @@ To install scrHLAtag:
 5. move this binary elsewhere if desired (ideally somewhere referenced by your PATH environment variable - e.g. `~/.local/bin`)
 
 ### Updates
-**version 0.1.7** - 5/13/25 - IMGT/HLA is now version: 3.60.0 - 2025-04, updated reference fastas to include a few alleles variable at the mRNA level despite nomenclature differing only in the 4th field 
+**version 0.1.7** - 5/13/25 - IMGT/HLA is nowv version 3.60.0 - 2025-04; updated reference fasta to include a few 4field alleles that differ at the mRNA level despite nomenclature.
 
 **version 0.1.6** - 4/21/25 - added qual string to fastq; fixed a bug that searched for nb tags in the aligned bam and printed long logfiles when it found none.  This had previously been fixed by writing nb in the readname.
 
@@ -72,7 +72,7 @@ DQB1*04:02:01
 ##### Help menu
 
 ```sh
-scrHLAtag 0.1.4
+scrHLAtag 0.1.6
 copyright Scott Furlan
 scrHLAtag is a command line tool for aligning and counting long-read sequence specific for HLA alleles in single cell
 libraries
