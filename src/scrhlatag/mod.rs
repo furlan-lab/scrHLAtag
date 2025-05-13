@@ -35,7 +35,7 @@ extern crate fastq;
 extern crate kseq;
 
 
-use std::{env, io::Write, str, fs, fs::File, error::Error, path::{Path, PathBuf}, collections::HashMap, process::{Command, Stdio }};
+use std::{collections::HashMap, env, error::Error, fs::{self, File}, io::Write, path::{Path, PathBuf}, process::{Command, Stdio }, str, vec};
 use std::io::{ BufReader, BufWriter};
 use clap::{App, load_yaml};
 use serde::Deserialize;
@@ -48,6 +48,7 @@ use itertools::Itertools;
 use kseq::parse_path;
 use simple_log::LogConfigBuilder;
 use simple_log::{info, warn, error};
+use arrayref::array_ref;
 // use toml::from_str;
 
 
@@ -470,12 +471,19 @@ pub fn make_fastq (params: &InputParams)-> Result<(), Box<dyn Error>> {
             new_readname = format!("{}{}{}_{}",&old_readname, &split, cb, umi );
         }
         
-        
+        let mut qual = vec![0; rec.qualities().len()];
+        if rec.qualities().available(){
+            qual = rec.qualities().to_readable();
+        } else {
+            err_count+=1;
+            eprintln!("No quality scores found for read {:?}", str::from_utf8(rec.name()).unwrap());
+            continue
+        }
         // write to fastq.gz
         let new_record: OwnedRecord = OwnedRecord{head: new_readname.as_bytes().to_vec(),
                                     seq: rec.sequence().to_vec(),
                                     sep: None,
-                                    qual: vec![255; rec.sequence().len()]};
+                                    qual: qual};
 
         let _nr = new_record.write(&mut writer);
     }
@@ -511,7 +519,7 @@ pub fn align (run: &Run)-> Result<(), Box<dyn Error>> {
                     .arg("--secondary=no")
                     .arg("-x")
                     .arg("map-hifi")
-                    .arg("-Q")  // TODO: this ignores base qual.  fix this later
+                    // .arg("-Q")  // TODO: this ignores base qual.  fix this later
                     .arg("--MD")
                     .arg("-a")
                     .arg("-t")
@@ -723,15 +731,14 @@ pub fn count(run: &Run) -> (Vec<Vec<u8>>, Vec<String>){
                         },
                 };
 
-                let _de_tag = match rec.tags().get(b"nb") {
-                    Some(TagValue::Int(value, _)) =>  value,  
-                    _ => {  
-                            // let e = rec.tags().get(b"nb");
-                            // eprintln!("{:?}", e);
-                            warn!("nb tag not returned correctly for read {:?}", rec.name());
-                            -1
-                        },
-                };
+                // let _de_tag = match rec.tags().get(b"nb") {
+                //     Some(TagValue::Int(value, _)) =>  value,  
+                //     _ => {  
+                //             // let e = rec.tags().get(b"nb");
+                //             warn!("nb tag not returned correctly for read {}", std::str::from_utf8(rec.name()).unwrap());
+                //             -1
+                //         },
+                // };
 
                 if nb_present {
                     if nb == 0 {
@@ -843,7 +850,7 @@ fn pop2(barry: &[u8]) -> &[u8; 2] {
 
 
 
-fn remove_whitespace( s: &str) ->  String{
+pub fn remove_whitespace( s: &str) ->  String{
     s.to_string().retain(|c| !c.is_whitespace());
     return s.to_string()
 }
@@ -851,4 +858,3 @@ fn remove_whitespace( s: &str) ->  String{
 fn get_current_working_dir() -> std::io::Result<PathBuf> {
     env::current_dir()
 }
-
